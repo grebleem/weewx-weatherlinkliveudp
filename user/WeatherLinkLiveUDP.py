@@ -123,6 +123,15 @@ import pprint
 DRIVER_NAME = 'WeatherLinkLiveUDP'
 DRIVER_VERSION = "0.1"
 
+MM_TO_INCH = 0.0393701
+
+print("BEGIN OF DIVER RUN!!!!!!!")
+
+# Open UDP Socket
+comsocket = socket(AF_INET, SOCK_DGRAM)
+comsocket.bind(('', 22222))
+comsocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+
 
 try:
     # Test for WeeWX v4 logging
@@ -173,7 +182,7 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
     """weewx driver that reads data from a file"""
 
     def __init__(self, **stn_dict):
-        self.poll_interval = float(stn_dict.get('poll_interval', 2.5))
+        self.poll_interval = float(stn_dict.get('poll_interval', 30))
 
         self.wll_ip = stn_dict.get('wll_ip')
         #print(self.wll_ip)
@@ -183,36 +192,51 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
         self.timeout = None
         self.StartTime = time.time()
 
-        self.Real_Time_URL = 'http://%s:80/v1/real_time?duration=60' % self.wll_ip
+        # Set UDP broadcast for 1 hour.
+        self.Real_Time_URL = 'http://%s:80/v1/real_time?duration=3600' % self.wll_ip
         self.CurrentConditions_URL = 'http://%s:80/v1/current_conditions' % self.wll_ip
 
         self.txid_ISS  = stn_dict.get('ISS_id', 1)
         self.txid_wind = stn_dict.get('wind_id', 1)
+
+        self.last_rain_storm = None
+        self.last_rain_storm_start_at = None
+
+        self.LaunchTime = time.time()
+        self.UPD_CountDown = 0
+
 
         #print(self.Real_Time_URL)
         log.info("Polling interval is %s" % self.poll_interval)
 
     def genLoopPackets(self):
         ### global URL
-        UDP_PORT = 22222
-        comsocket = socket(AF_INET, SOCK_DGRAM)
-        comsocket.bind(('', 22222))
-        comsocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+        ####UDP_PORT = 22222
+
+        print("Launch Time:", time.strftime("%H:%M:%S", time.gmtime(self.LaunchTime)))
+        print("Currnt Time:", time.strftime("%H:%M:%S", time.gmtime(time.time())) )
         try:
-            resp = requests.get(self.Real_Time_URL)
+            if self.UPD_CountDown < time.time():
+                print("KICK ON UDP")
+                req = requests.get(self.Real_Time_URL)
+                Req_data = req.json()
+                self.UPD_CountDown = time.time() + Req_data['data']['duration']
+                print ("end UDP = ", time.strftime("%H:%M:%S", time.gmtime(self.UPD_CountDown)))
+                print("Currnt Time:", time.strftime("%H:%M:%S", time.gmtime(time.time())))
+                ResponseString = "UDP broadcast end:", time.strftime("%H:%M:%S", time.gmtime(self.UPD_CountDown))
+                logdbg(ResponseString)
+
         except Exception as e:
             logerr("read failed: %s" % e)
             pass
 
-        #print(URL)
-        #print("HTTP Response Code:", resp)
         #print(resp)
         #print(resp.status_code)
         while True:
             # read whatever values we can get from the file
             #data = {}
             try:
-                self.timeout = time.time() + 10
+                self.timeout = time.time() + self.poll_interval
                 while time.time() < self.timeout:
                     ########print("Poll Intervall:", self.poll_interval)
                     ###elapsed_time = time.time() - self.StartTime
@@ -235,10 +259,24 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
                                 #print("HWnD:", testDict["wind_dir_at_hi_speed_last_10_min"],"/", testDict["wind_speed_hi_last_10_min"] )
                                 #print(timestampUDP)
                                 ##_packet.update({'windDir': condition["wind_dir_last"]})
-                                _packet.update({'windSpeed': condition["wind_speed_last"]})
-                                _packet.update({'windDir': condition["wind_dir_last"]})
-                                _packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
-                                _packet.update({'windGustDir': condition["wind_dir_at_hi_speed_last_10_min"]})
+                                #_packet.update({'windSpeed': condition["wind_speed_last"]})
+                                #_packet.update({'windDir': condition["wind_dir_last"]})
+                                #_packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
+                                #_packet.update({'windGustDir': condition["wind_dir_at_hi_speed_last_10_min"]})
+
+                                if "wind_speed_last" in condition:  # most recent valid wind speed **(mph)**
+                                    _packet.update({'windSpeed': condition["wind_speed_last"]})
+
+                                if "wind_dir_last" in condition:  # most recent valid wind direction **(°degree)**
+                                    _packet.update({'windDir': condition["wind_dir_last"]})
+
+                                if "wind_speed_hi_last_10_min" in condition:  # maximum wind speed over last 10 min **(mph)**
+                                    _packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
+
+                                if "wind_dir_scalar_avg_last_10_min" in condition:  # gust wind direction over last 10 min **(°degree)**
+                                    _packet.update({'windGustDir': condition["wind_dir_scalar_avg_last_10_min"]})
+
+                                # Yield UDP
                                 yield _packet
 
                 #comsocket.close()
@@ -253,7 +291,6 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
                 elapsed_time = time.time() - self.StartTime
                 print("elapsed Time:", time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
-
                 ##### Actual Data from WLL
                 try:
                     CurrentConditionRequest = requests.get(self.CurrentConditions_URL, timeout=1)
@@ -263,6 +300,7 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
                     logerr("Error connecting to the WLL.")
                     logerr("%s" % e)
 
+                    # Sleep for 1 UDP cycle
                     time.sleep(2)
 
                     continue  # Move Along
@@ -303,8 +341,65 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
                         if "uv_index" in condition:  #
                             _packet.update({'UV': condition['uv_index']})
 
+                        ## Wind
+                        if "wind_speed_last" in condition:  # most recent valid wind speed **(mph)**
+                            _packet.update({'windSpeed': condition["wind_speed_last"]})
+
+                        if "wind_dir_last" in condition:  # most recent valid wind direction **(°degree)**
+                            _packet.update({'windDir': condition["wind_dir_last"]})
+
+                        if "wind_speed_hi_last_10_min" in condition:  # maximum wind speed over last 10 min **(mph)**
+                            _packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
+
+                        if "wind_dir_scalar_avg_last_10_min" in condition:  # gust wind direction over last 10 min **(°degree)**
+                            _packet.update({'windGustDir': condition["wind_dir_scalar_avg_last_10_min"]})
+
                         if "trans_battery_flag" in condition:  #
                             _packet.update({'txBatteryStatus': condition['trans_battery_flag']})
+                        if "rain_size" in condition:  # rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")**
+
+                            rain_collector_type = condition["rain_size"]
+
+                            if 1 <= rain_collector_type <= 4:
+
+                                if rain_collector_type == 1:
+                                    rain_count_size = 0.01
+
+                                elif rain_collector_type == 2:
+                                    rain_count_size = 0.2 * MM_TO_INCH
+
+                                elif rain_collector_type == 3:
+                                    rain_count_size = 0.1
+
+                                elif rain_collector_type == 4:
+                                    rain_count_size = 0.001 * MM_TO_INCH
+
+                                if "rain_rate_last" in condition:  # most recent valid rain rate **(counts/hour)**
+                                    _packet.update({'rainRate': float(condition["rain_rate_last"]) * rain_count_size})
+
+                                if "rain_storm" in condition and "rain_storm_start_at" in condition:
+
+                                    # Calculate the rain accumulation by reading the total rain count and checking the increments
+
+                                    rain_storm = condition[
+                                        "rain_storm"]  # total rain count since last 24 hour long break in rain **(counts)**
+                                    rain_storm_start_at = condition[
+                                        "rain_storm_start_at"]  # UNIX timestamp of current rain storm start **(seconds)**
+
+                                    rain_count = 0.0
+
+                                    if self.last_rain_storm is not None and self.last_rain_storm_start_at is not None:
+
+                                        if rain_storm_start_at != self.last_rain_storm_start_at:
+                                            rain_count = rain_storm
+
+                                        elif rain_storm >= self.last_rain_storm:
+                                            rain_count = float(rain_storm) - float(self.last_rain_storm)
+
+                                    self.last_rain_storm = rain_storm
+                                    self.last_rain_storm_start_at = rain_storm_start_at
+
+                                    _packet.update({'rain': rain_count * rain_count_size})
 
                     # 3 = LSS BAR Current Conditions record
                     elif condition['data_structure_type'] == 3:
@@ -333,7 +428,6 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
                     #print(_packet)
                     #
 
-
                 ## except from try to get actual Conditions
                 ###except Exception as e
 
@@ -348,10 +442,11 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
             #    _packet[self.label_map.get(vname, vname)] = _get_as_float(data, vname)
 
             ###yield _packet
-
-            time.sleep(2)
-
-            ##comsocket.close()
+            #Sleep for one UDP cycle
+            time.sleep(2.5)
+        # Close UDP socket
+        #print("Close Socket")
+        #comsocket.close()
 
     @property
     def hardware_name(self):
