@@ -17,100 +17,17 @@
 #
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 
-# "data":
-# {
-#     "did":"001D0A700002",
-#     "ts":1531754005,
-#     "conditions": [
-#     {
-#             "lsid":48308,                                  // logical sensor ID **(no unit)**
-#             "data_structure_type":1,                       // data structure type **(no unit)**
-#             "txid":1,                                      // transmitter ID **(no unit)**
-#             "temp": 62.7,                                  // most recent valid temperature **(°F)**
-#             "hum":1.1,                                     // most recent valid humidity **(%RH)**
-#             "dew_point": -0.3,                             // **(°F)**
-#             "wet_bulb":null,                               // **(°F)**
-#             "heat_index": 5.5,                             // **(°F)**
-#             "wind_chill": 6.0,                             // **(°F)**
-#             "thw_index": 5.5,                              // **(°F)**
-#             "thsw_index": 5.5,                             // **(°F)**
-#             "wind_speed_last":2,                           // most recent valid wind speed **(mph)**
-#             "wind_dir_last":null,                          // most recent valid wind direction **(°degree)**
-#             "wind_speed_avg_last_1_min":4                  // average wind speed over last 1 min **(mph)**
-#             "wind_dir_scalar_avg_last_1_min":15            // scalar average wind direction over last 1 min **(°degree)**
-#             "wind_speed_avg_last_2_min":42606,             // average wind speed over last 2 min **(mph)**
-#             "wind_dir_scalar_avg_last_2_min": 170.7,       // scalar average wind direction over last 2 min **(°degree)**
-#             "wind_speed_hi_last_2_min":8,                  // maximum wind speed over last 2 min **(mph)**
-#             "wind_dir_at_hi_speed_last_2_min":0.0,         // gust wind direction over last 2 min **(°degree)**
-#             "wind_speed_avg_last_10_min":42606,            // average wind speed over last 10 min **(mph)**
-#             "wind_dir_scalar_avg_last_10_min": 4822.5,     // scalar average wind direction over last 10 min **(°degree)**
-#             "wind_speed_hi_last_10_min":8,                 // maximum wind speed over last 10 min **(mph)**
-#             "wind_dir_at_hi_speed_last_10_min":0.0,        // gust wind direction over last 10 min **(°degree)**
-#             "rain_size":2,                                 // rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")**
-#             "rain_rate_last":0,                            // most recent valid rain rate **(counts/hour)**
-#             "rain_rate_hi":null,                           // highest rain rate over last 1 min **(counts/hour)**
-#             "rainfall_last_15_min":null,                   // total rain count over last 15 min **(counts)**
-#             "rain_rate_hi_last_15_min":0,                  // highest rain rate over last 15 min **(counts/hour)**
-#             "rainfall_last_60_min":null,                   // total rain count for last 60 min **(counts)**
-#             "rainfall_last_24_hr":null,                    // total rain count for last 24 hours **(counts)**
-#             "rain_storm":null,                             // total rain count since last 24 hour long break in rain **(counts)**
-#             "rain_storm_start_at":null,                    // UNIX timestamp of current rain storm start **(seconds)**
-#             "solar_rad":747,                               // most recent solar radiation **(W/m²)**
-#             "uv_index":5.5,                                // most recent UV index **(Index)**
-#             "rx_state":2,                                  // configured radio receiver state **(no unit)**
-#             "trans_battery_flag":0,                        // transmitter battery status flag **(no unit)**
-#             "rainfall_daily":63,                           // total rain count since local midnight **(counts)**
-#             "rainfall_monthly":63,                         // total rain count since first of month at local midnight **(counts)**
-#             "rainfall_year":63,                            // total rain count since first of user-chosen month at local midnight **(counts)**
-#             "rain_storm_last":null,                        // total rain count since last 24 hour long break in rain **(counts)**
-#             "rain_storm_last_start_at":null,               // UNIX timestamp of last rain storm start **(sec)**
-#             "rain_storm_last_end_at":null                  // UNIX timestamp of last rain storm end **(sec)**
-#     },
-#     {
-#             "lsid":3187671188,
-#             "data_structure_type":2,
-#             "txid":3,
-#             "temp_1":null,                                 // most recent valid soil temp slot 1 **(°F)**
-#             "temp_2":null,                                 // most recent valid soil temp slot 2 **(°F)**
-#             "temp_3":null,                                 // most recent valid soil temp slot 3 **(°F)**
-#             "temp_4":null,                                 // most recent valid soil temp slot 4 **(°F)**
-#             "moist_soil_1":null,                           // most recent valid soil moisture slot 1 **(|cb|)**
-#             "moist_soil_2":null,                           // most recent valid soil moisture slot 2 **(|cb|)**
-#             "moist_soil_3":null,                           // most recent valid soil moisture slot 3 **(|cb|)**
-#             "moist_soil_4":null,                           // most recent valid soil moisture slot 4 **(|cb|)**
-#             "wet_leaf_1":null,                             // most recent valid leaf wetness slot 1 **(no unit)**
-#             "wet_leaf_2":null,                             // most recent valid leaf wetness slot 2 **(no unit)**
-#             "rx_state":null,                               // configured radio receiver state **(no unit)**
-#             "trans_battery_flag":null                      // transmitter battery status flag **(no unit)**
-#     },
-#     {
-#             "lsid":48307,
-#             "data_structure_type":4,
-#             "temp_in":78.0,                                // most recent valid inside temp **(°F)**
-#             "hum_in":41.1,                                 // most recent valid inside humidity **(%RH)**
-#             "dew_point_in":7.8,                            // **(°F)**
-#             "heat_index_in":8.4                            // **(°F)**
-#     },
-#     {
-#             "lsid":48306,
-#             "data_structure_type":3,
-#             "bar_sea_level":30.008,                       // most recent bar sensor reading with elevation adjustment **(inches)**
-#             "bar_trend": null,                            // current 3 hour bar trend **(inches)**
-#             "bar_absolute":30.008                         // raw bar sensor reading **(inches)**
-#     }]
-# },
-# "error":null }
-#
+
 
 
 from __future__ import with_statement
-import logging
-import time
+#import logging
+#import time
 
 from socket import *
-import struct
+#import struct
 import time
-from typing import Dict, Any, Union
+#from typing import Dict, Any, Union
 
 import requests
 import json
@@ -124,8 +41,6 @@ DRIVER_NAME = 'WeatherLinkLiveUDP'
 DRIVER_VERSION = "0.1"
 
 MM_TO_INCH = 0.0393701
-
-print("BEGIN OF DIVER RUN!!!!!!!")
 
 # Open UDP Socket
 comsocket = socket(AF_INET, SOCK_DGRAM)
@@ -176,13 +91,13 @@ def _get_as_float(d, s):
     return v
 
 def loader(config_dict, engine):
-    return FileParseDriver(**config_dict[DRIVER_NAME])
+    return WeatherLinkLiveUDPDriver(**config_dict[DRIVER_NAME])
 
-class FileParseDriver(weewx.drivers.AbstractDevice):
+class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
     """weewx driver that reads data from a file"""
 
     def __init__(self, **stn_dict):
-        self.poll_interval = float(stn_dict.get('poll_interval', 30))
+        self.poll_interval = float(stn_dict.get('poll_interval', 10))
 
         self.wll_ip = stn_dict.get('wll_ip')
         #print(self.wll_ip)
@@ -213,16 +128,16 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
         ### global URL
         ####UDP_PORT = 22222
 
-        print("Launch Time:", time.strftime("%H:%M:%S", time.gmtime(self.LaunchTime)))
-        print("Currnt Time:", time.strftime("%H:%M:%S", time.gmtime(time.time())) )
+        #print("Launch Time:", time.strftime("%H:%M:%S", time.gmtime(self.LaunchTime)))
+        ##print("Currnt Time:", time.strftime("%H:%M:%S", time.gmtime(time.time())) )
         try:
             if self.UPD_CountDown < time.time():
-                print("KICK ON UDP")
+                #print("KICK ON UDP")
                 req = requests.get(self.Real_Time_URL)
                 Req_data = req.json()
                 self.UPD_CountDown = time.time() + Req_data['data']['duration']
-                print ("end UDP = ", time.strftime("%H:%M:%S", time.gmtime(self.UPD_CountDown)))
-                print("Currnt Time:", time.strftime("%H:%M:%S", time.gmtime(time.time())))
+                #print ("end UDP = ", time.strftime("%H:%M:%S", time.gmtime(self.UPD_CountDown)))
+                #print("Currnt Time:", time.strftime("%H:%M:%S", time.gmtime(time.time())))
                 ResponseString = "UDP broadcast end:", time.strftime("%H:%M:%S", time.gmtime(self.UPD_CountDown))
                 logdbg(ResponseString)
 
@@ -238,10 +153,10 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
             try:
                 self.timeout = time.time() + self.poll_interval
                 while time.time() < self.timeout:
-                    ########print("Poll Intervall:", self.poll_interval)
-                    ###elapsed_time = time.time() - self.StartTime
-                    ####print("elapsed Time:", time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
-                    #### print("Loop until:", self.timeout)
+                    #print("Poll Intervall:", self.poll_interval)
+                    #elapsed_time = time.time() - self.StartTime
+                    #print("elapsed Time:", time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+                    #print("Loop until:", self.timeout)
                     data, wherefrom = comsocket.recvfrom(2048)
                     UDP_data = json.loads(data.decode("utf-8"))
                     if UDP_data["conditions"] == None:
@@ -287,9 +202,9 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
                 #         value = line[eq_index + 1:].strip()
                 #         data[name] = value
 
-                print("----------------------------")
-                elapsed_time = time.time() - self.StartTime
-                print("elapsed Time:", time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+                #print("----------------------------")
+                #elapsed_time = time.time() - self.StartTime
+                #print("elapsed Time:", time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
                 ##### Actual Data from WLL
                 try:
@@ -356,6 +271,10 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
 
                         if "trans_battery_flag" in condition:  #
                             _packet.update({'txBatteryStatus': condition['trans_battery_flag']})
+
+                        if "rx_state" in condition:
+                            _packet.update({'signal1': condition['rx_state']})
+
                         if "rain_size" in condition:  # rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")**
 
                             rain_collector_type = condition["rain_size"]
@@ -441,7 +360,6 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
             #for vname in data:
             #    _packet[self.label_map.get(vname, vname)] = _get_as_float(data, vname)
 
-            ###yield _packet
             #Sleep for one UDP cycle
             time.sleep(2.5)
         # Close UDP socket
@@ -450,17 +368,105 @@ class FileParseDriver(weewx.drivers.AbstractDevice):
 
     @property
     def hardware_name(self):
-        return "FileParse"
+        return "WeatherLinkLiveUDP"
 
 # To test this driver, run it directly as follows:
-#   PYTHONPATH=/home/weewx/bin python /home/weewx/bin/user/fileparse.py
-# if __name__ == "__main__":
-#     import weeutil.weeutil
-#     import weeutil.logger
-#     import weewx
-#     weewx.debug = 1
-#     weeutil.logger.setup('fileparse', {})
+#   PYTHONPATH=/home/weewx/bin python /home/weewx/bin/user/WeatherLinkLiveUDP.py
+if __name__ == "__main__":
+    import weeutil.weeutil
+    import weeutil.logger
+    import weewx
+    weewx.debug = 1
+    weeutil.logger.setup('WeatherLinkLiveUDP', {})
+    print("Main")
+    driver = WeatherLinkLiveUDPDriver()
+    for packet in driver.genLoopPackets():
+        print(weeutil.weeutil.timestamp_to_string(packet['dateTime']), packet)
+
+
+
+
+# "data":
+# {
+#     "did":"001D0A700002",
+#     "ts":1531754005,
+#     "conditions": [
+#     {
+#             "lsid":48308,                                  // logical sensor ID **(no unit)**
+#             "data_structure_type":1,                       // data structure type **(no unit)**
+#             "txid":1,                                      // transmitter ID **(no unit)**
+#             "temp": 62.7,                                  // most recent valid temperature **(°F)**
+#             "hum":1.1,                                     // most recent valid humidity **(%RH)**
+#             "dew_point": -0.3,                             // **(°F)**
+#             "wet_bulb":null,                               // **(°F)**
+#             "heat_index": 5.5,                             // **(°F)**
+#             "wind_chill": 6.0,                             // **(°F)**
+#             "thw_index": 5.5,                              // **(°F)**
+#             "thsw_index": 5.5,                             // **(°F)**
+#             "wind_speed_last":2,                           // most recent valid wind speed **(mph)**
+#             "wind_dir_last":null,                          // most recent valid wind direction **(°degree)**
+#             "wind_speed_avg_last_1_min":4                  // average wind speed over last 1 min **(mph)**
+#             "wind_dir_scalar_avg_last_1_min":15            // scalar average wind direction over last 1 min **(°degree)**
+#             "wind_speed_avg_last_2_min":42606,             // average wind speed over last 2 min **(mph)**
+#             "wind_dir_scalar_avg_last_2_min": 170.7,       // scalar average wind direction over last 2 min **(°degree)**
+#             "wind_speed_hi_last_2_min":8,                  // maximum wind speed over last 2 min **(mph)**
+#             "wind_dir_at_hi_speed_last_2_min":0.0,         // gust wind direction over last 2 min **(°degree)**
+#             "wind_speed_avg_last_10_min":42606,            // average wind speed over last 10 min **(mph)**
+#             "wind_dir_scalar_avg_last_10_min": 4822.5,     // scalar average wind direction over last 10 min **(°degree)**
+#             "wind_speed_hi_last_10_min":8,                 // maximum wind speed over last 10 min **(mph)**
+#             "wind_dir_at_hi_speed_last_10_min":0.0,        // gust wind direction over last 10 min **(°degree)**
+#             "rain_size":2,                                 // rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")**
+#             "rain_rate_last":0,                            // most recent valid rain rate **(counts/hour)**
+#             "rain_rate_hi":null,                           // highest rain rate over last 1 min **(counts/hour)**
+#             "rainfall_last_15_min":null,                   // total rain count over last 15 min **(counts)**
+#             "rain_rate_hi_last_15_min":0,                  // highest rain rate over last 15 min **(counts/hour)**
+#             "rainfall_last_60_min":null,                   // total rain count for last 60 min **(counts)**
+#             "rainfall_last_24_hr":null,                    // total rain count for last 24 hours **(counts)**
+#             "rain_storm":null,                             // total rain count since last 24 hour long break in rain **(counts)**
+#             "rain_storm_start_at":null,                    // UNIX timestamp of current rain storm start **(seconds)**
+#             "solar_rad":747,                               // most recent solar radiation **(W/m²)**
+#             "uv_index":5.5,                                // most recent UV index **(Index)**
+#             "rx_state":2,                                  // configured radio receiver state **(no unit)**
+#             "trans_battery_flag":0,                        // transmitter battery status flag **(no unit)**
+#             "rainfall_daily":63,                           // total rain count since local midnight **(counts)**
+#             "rainfall_monthly":63,                         // total rain count since first of month at local midnight **(counts)**
+#             "rainfall_year":63,                            // total rain count since first of user-chosen month at local midnight **(counts)**
+#             "rain_storm_last":null,                        // total rain count since last 24 hour long break in rain **(counts)**
+#             "rain_storm_last_start_at":null,               // UNIX timestamp of last rain storm start **(sec)**
+#             "rain_storm_last_end_at":null                  // UNIX timestamp of last rain storm end **(sec)**
+#     },
+#     {
+#             "lsid":3187671188,
+#             "data_structure_type":2,
+#             "txid":3,
+#             "temp_1":null,                                 // most recent valid soil temp slot 1 **(°F)**
+#             "temp_2":null,                                 // most recent valid soil temp slot 2 **(°F)**
+#             "temp_3":null,                                 // most recent valid soil temp slot 3 **(°F)**
+#             "temp_4":null,                                 // most recent valid soil temp slot 4 **(°F)**
+#             "moist_soil_1":null,                           // most recent valid soil moisture slot 1 **(|cb|)**
+#             "moist_soil_2":null,                           // most recent valid soil moisture slot 2 **(|cb|)**
+#             "moist_soil_3":null,                           // most recent valid soil moisture slot 3 **(|cb|)**
+#             "moist_soil_4":null,                           // most recent valid soil moisture slot 4 **(|cb|)**
+#             "wet_leaf_1":null,                             // most recent valid leaf wetness slot 1 **(no unit)**
+#             "wet_leaf_2":null,                             // most recent valid leaf wetness slot 2 **(no unit)**
+#             "rx_state":null,                               // configured radio receiver state **(no unit)**
+#             "trans_battery_flag":null                      // transmitter battery status flag **(no unit)**
+#     },
+#     {
+#             "lsid":48307,
+#             "data_structure_type":4,
+#             "temp_in":78.0,                                // most recent valid inside temp **(°F)**
+#             "hum_in":41.1,                                 // most recent valid inside humidity **(%RH)**
+#             "dew_point_in":7.8,                            // **(°F)**
+#             "heat_index_in":8.4                            // **(°F)**
+#     },
+#     {
+#             "lsid":48306,
+#             "data_structure_type":3,
+#             "bar_sea_level":30.008,                       // most recent bar sensor reading with elevation adjustment **(inches)**
+#             "bar_trend": null,                            // current 3 hour bar trend **(inches)**
+#             "bar_absolute":30.008                         // raw bar sensor reading **(inches)**
+#     }]
+# },
+# "error":null }
 #
-#     driver = FileParseDriver()
-#     for packet in driver.genLoopPackets():
-#         print(weeutil.weeutil.timestamp_to_string(packet['dateTime']), packet)
