@@ -22,4 +22,4 @@ class WLLInstaller(ExtensionInstaller):
                     'driver': 'user.weatherlinkliveudp'
                 }
             },
-            files=[('bin/user', ['bin/user/weatherlinkliveudp.py'])])
+            files=[('bin/user', ['/user/weatherlinkliveudp.py'])])
