@@ -5,12 +5,12 @@
 from setup import ExtensionInstaller
 
 def loader():
-    return weatherlinkliveudp()
+    return weatherlinkliveudpInstaller()
 
-class weatherlinkliveudp(ExtensionInstaller):
+class weatherlinkliveudpInstaller(ExtensionInstaller):
     def __init__(self):
-        super(weatherlinkliveudp, self).__init__(
-            version="0.2",
+        super(weatherlinkliveudpInstaller, self).__init__(
+            version='0.2',
             name='weatherlinkliveudp',
             description='Periodically poll weather data from a WeatherLink Live device',
             author="Bastiaan Meelberg",
@@ -22,4 +22,5 @@ class weatherlinkliveudp(ExtensionInstaller):
                     'driver': 'user.weatherlinkliveudp'
                 }
             },
-            files=[('bin/user', ['bin/user/weatherlinkliveudp.py'])])
+            files=[('bin/user', ['bin/user/weatherlinkliveudp.py'])]
+        )
