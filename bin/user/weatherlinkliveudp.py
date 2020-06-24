@@ -85,15 +85,6 @@ except ImportError:
         logmsg(syslog.LOG_ERR, msg)
 
 
-def _get_as_float(d, s):
-    v = None
-    if s in d:
-        try:
-            v = float(d[s])
-        except ValueError as e:
-            logerr("cannot read value for '%s': %s" % (s, e))
-    return v
-
 def loader(config_dict, engine):
     return WeatherLinkLiveUDPDriver(**config_dict[DRIVER_NAME])
 
@@ -138,8 +129,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
 
     def genLoopPackets(self):
-        ### global URL
-        ####UDP_PORT = 22222
+
         while True:
             try:
                 response = requests.get(self.CurrentConditions_URL)
