@@ -4,6 +4,8 @@ Also it collects a real-time 2.5 sec broadcast for wind speed and rain over UDP 
 
 [See Davis weatherlink-live-local-api](https://weatherlink.github.io/weatherlink-live-local-api/)
 
+To see a live demo of this plugin in vist [meteo-otterlo.nl](https://meteo-otterlo.nl), it features the [Belchertown weewx skin](https://github.com/poblabs/weewx-belchertown#belchertown-weewx-skin) from [Pat O'Brien](https://github.com/poblabs) with a MQTT broker to display the 2.5 seconds wind and rain data.
+
 ### Installation
 
 1) Download the driver
