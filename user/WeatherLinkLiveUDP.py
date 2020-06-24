@@ -30,10 +30,12 @@ import time
 import requests
 import json
 
+from requests.exceptions import HTTPError
+
 import weewx.drivers
 
 ## DEBUG ONLY
-import pprint
+#import pprint
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
 DRIVER_VERSION = "0.1"
@@ -70,7 +72,7 @@ except ImportError:
     import syslog
 
     def logmsg(level, msg):
-        syslog.syslog(level, 'WLL: %s' % msg)
+        syslog.syslog(level, 'WLL UDP: %s' % msg)
 
     def logdbg(msg):
         logmsg(syslog.LOG_DEBUG, msg)
@@ -99,9 +101,10 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
     def __init__(self, **stn_dict):
         # Show Diver version
-        log.info('WLL UDP driver version is %s' % DRIVER_VERSION)
+        loginf('WLL UDP driver version is %s' % DRIVER_VERSION)
 
         self.poll_interval = float(stn_dict.get('poll_interval', DEFAULT_POLL_INTERVALL))
+        loginf('TCP polling interval is %s' % self.poll_interval)
 
         self.wll_ip = stn_dict.get('wll_ip',DEFAULT_TCP_ADDR)
         #print(self.wll_ip)
@@ -111,8 +114,8 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         self.timeout = None
         self.StartTime = time.time()
 
-        # Tells the WW to begin broadcasting UDP data and continue for 1200 seconds (20 minutes)
-        self.Real_Time_URL = 'http://%s:80/v1/real_time' % self.wll_ip
+        # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
+        self.Real_Time_URL = 'http://%s:80/v1/real_time?duration=3600' % self.wll_ip
         self.CurrentConditions_URL = 'http://%s:80/v1/current_conditions' % self.wll_ip
 
         self.txid_ISS  = stn_dict.get('ISS_id', 1)
@@ -125,9 +128,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         self.UPD_CountDown = 0
 
 
-        #print(self.Real_Time_URL)
-        log.info("Polling interval is %s" % self.poll_interval)
-
     @property
     def hardware_name(self):
         return "WeatherLinkLiveUDP"
@@ -137,30 +137,37 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         ### global URL
         ####UDP_PORT = 22222
         while True:
-            # Sleep one UDP Cycle
-            # time.sleep(2.5)
+            try:
+                response = requests.get(self.CurrentConditions_URL)
+                # If the response was successful, no Exception will be raised
+                response.raise_for_status()
+            except HTTPError as http_err:
+                errormsg = ('HTTP error occurred: {http_err}')  # Python 3.6
+                loginf(errormsg)
+
+            except Exception as err:
+                errormsg = ('Other error occurred: {err}')  # Python 3.6
+                loginf(errormsg)
+
+            else:
 
             # Get current Conditions
-            try:
-                CurrentConditionRequest = requests.get(self.CurrentConditions_URL)
+            # try:
+            #     CurrentConditionRequest = requests.get(self.CurrentConditions_URL)
+            # except Exception as error:
+            #
+            #     logerr("Error connecting to the WLL.")
+            #     logerr("%s" % error)
+            #     #
+            #     time.sleep(2.5)
+            #
+            #     continue  # Move Along
 
-            except Exception as error:
+                CurrentConditions = response.json()
+                packet = self.DecodeDataWLL(CurrentConditions['data'])
+                yield packet
 
-                logerr("Error connecting to the WLL.")
-                logerr("%s" % error)
-                #
-                time.sleep(2.5)
-
-                continue  # Move Along
-
-            CurrentConditions = CurrentConditionRequest.json()
-            packet = self.DecodeDataWLL(CurrentConditions['data'])
-            #####print(packet)
-            yield packet
-            # Sleep one UDP Cycle
-
-            ### time.sleep(5)
-
+            # Check if UDP is still on
             self.Check_UDP_Broascast()
 
             # Set timer to listen to UDP
@@ -296,15 +303,44 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
     def Check_UDP_Broascast(self):
         if self.UPD_CountDown < time.time():
-            print("KICK ON UDP")
-            req = requests.get(self.Real_Time_URL)
-            Req_data = req.json()
-            print(Req_data['data']['duration'])
-            self.UPD_CountDown = time.time() + Req_data['data']['duration']
-            ##print ("end UDP = ", (self.UPD_CountDown))
-            ##print("Currnt Time:", time.time())
-            ResponseString = "UDP broadcast end:", weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)
-            logdbg(ResponseString)
+            try:
+                response = requests.get(self.Real_Time_URL)
+                # If the response was successful, no Exception will be raised
+                response.raise_for_status()
+            except HTTPError as http_err:
+                errormsg = (f'HTTP error occurred: {http_err}')  # Python 3.6
+                loginf(errormsg)
+
+            except Exception as err:
+                errormsg = (f'Other error occurred: {err}')  # Python 3.6
+                loginf(errormsg)
+
+            else:
+                Req_data = response.json()
+                print(Req_data)
+                self.UPD_CountDown = time.time() + Req_data['data']['duration']
+                ## ResponseString = "UDP broadcast end:", weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)
+                # print(f'Updated {date.today().strftime("%m/%d/%Y")}')
+                loginf(f'UDP broadcast ends: {weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)}')
+
+
+
+
+            # logdbg("Ask WLL for UDP Broadcast")
+            # try:
+            #     req = requests.get(self.Real_Time_URL)
+            # except Exception as error:
+            #
+            #     logerr("Error switching on UDP.")
+            #     logerr("%s" % error)
+            #     #
+            #     time.sleep(2)
+            #
+            # Req_data = req.json()
+            # print(Req_data)
+            # self.UPD_CountDown = time.time() + Req_data['data']['duration']
+            # ResponseString = "UDP broadcast end:", weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)
+            # loginf(ResponseString)
 
 
 # To test this driver, run it directly as follows:
@@ -317,11 +353,6 @@ if __name__ == "__main__":
     weeutil.logger.setup('WeatherLinkLiveUDP', {})
     print(weeutil.weeutil.timestamp_to_string(time.time()))
     print("Main:")
-    effe = time.time()
-    x = time.time()
-    y = x + 20
-    print(x)
-    print(y)
 
     driver = WeatherLinkLiveUDPDriver()
     for packet in driver.genLoopPackets():
