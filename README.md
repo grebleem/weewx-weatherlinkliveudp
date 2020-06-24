@@ -18,7 +18,7 @@ wget -O weatherlinkliveudp.zip https://github.com/grebleem/*************/archive
 sudo wee_extension --install weatherlinkliveudp.zip
 ```
 
-3) Set the `station_type` to `WLL` and modify the `[WLL]` stanza in `weewx.conf`:
+3) Set the `station_type` to `WeatherLinkLiveUDP` and modify the `[WeatherLinkLiveUDP]` stanza in `weewx.conf`:
 ```
 [Station]
 
