@@ -38,7 +38,7 @@ import weewx.drivers
 #import pprint
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = "0.1"
+DRIVER_VERSION = "0.2"
 
 MM_TO_INCH = 0.0393701
 
