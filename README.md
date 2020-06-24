@@ -9,9 +9,9 @@ To see a live demo of this plugin in vist [meteo-otterlo.nl](https://meteo-otter
 ### Installation
 
 1) Download the driver
-https://github.com/grebleem/WeatherLinkLiveUDP/archive/v0.2.zip
+
 ```
-wget -O weatherlinkliveudp.zip https://github.com/grebleem/*************/archive/master.zip
+wget -O weatherlinkliveudp.zip https://github.com/grebleem/WeatherLinkLiveUDP/archive/master.zip
 ```
 
 2) Install the driver
