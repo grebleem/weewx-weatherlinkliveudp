@@ -16,8 +16,9 @@ class WLLInstaller(ExtensionInstaller):
             author="Bastiaan Meelberg",
             config={
                 'WeatherLinkLiveUDP': {
-                    'host': '1.2.3.4',
+                    'wll_ip': '1.2.3.4',
                     'poll_interval': 15,
+                    'ISS_id = 1'
                     'driver': 'user.weatherlinkliveudp'
                 }
             },

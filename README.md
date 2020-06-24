@@ -9,7 +9,7 @@ To see a live demo of this plugin in vist [meteo-otterlo.nl](https://meteo-otter
 ### Installation
 
 1) Download the driver
-
+https://github.com/grebleem/WeatherLinkLiveUDP/archive/v0.2.zip
 ```
 wget -O weatherlinkliveudp.zip https://github.com/grebleem/*************/archive/master.zip
 ```
@@ -32,14 +32,13 @@ sudo wee_extension --install weatherlinkliveudp.zip
     wll_ip = 192.168.1.47
     poll_interval = 15    # number of seconds
     ISS_id = 1
-    wind_id = 4
     driver = user.weatherlinkliveudp
 ```
 
 4) Restart WeeWX
 
 ```
-sudo /etc/init.d/weewx restart
+sudo systemctl restart weewx
 ```
 
 Note: The driver requires the Python `requests` library. To install it:
@@ -48,7 +47,7 @@ Note: The driver requires the Python `requests` library. To install it:
 sudo apt-get update 
 sudo apt-get install python-requests
 ```
-or
+or us pip
 ```
 pip install requests
 ```
