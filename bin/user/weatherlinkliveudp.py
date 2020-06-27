@@ -22,24 +22,31 @@ See Davis weatherlink-live-local-api
 
 
 """
+
+
+#### TO DO FIRST TCP SHOULD BE CORRECT AND GIVE TIME
+
 from __future__ import with_statement
 
 from socket import *
 import time
 
 import requests
+
 import json
 
 from requests.exceptions import HTTPError
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 import weewx.drivers
-
+import datetime
 
 ## DEBUG ONLY
 #import pprint
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.1b'
+DRIVER_VERSION = '0.2.2b'
 
 MM2INCH = 1/25.4
 
@@ -67,7 +74,6 @@ try:
 
     def logerr(msg):
         log.error(msg)
-
 except ImportError:
     # Old-style WeeWX logging
     import syslog
@@ -91,7 +97,6 @@ def loader(config_dict, engine):
 class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
     """weewx driver that reads data from a WeatherLink Live
 
-
     """
 
     def __init__(self, **stn_dict):
@@ -99,74 +104,103 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         loginf('WLL UDP driver version is %s' % DRIVER_VERSION)
 
         self.poll_interval = float(stn_dict.get('poll_interval', DEFAULT_POLL_INTERVALL))
-        loginf('TCP polling interval is %s' % self.poll_interval)
+        loginf('HTTP polling interval is %s' % self.poll_interval)
 
         self.wll_ip = stn_dict.get('wll_ip',DEFAULT_TCP_ADDR)
         #print(self.wll_ip)
         if self.wll_ip is None:
-            logerr("No Weatherlink Live URL provided")
+            logerr("No Weatherlink Live IP provided")
 
-        self.timeout = None
+        ##self.max_tries = int(stn_dict.get('max_tries', 5))
+        ###self.time_out = int(stn_dict.get('time_out', 10))
+
         self.StartTime = time.time()
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
-        self.Real_Time_URL = 'http://%s:80/v1/real_time?duration=3600' % self.wll_ip
-        self.CurrentConditions_URL = 'http://%s:80/v1/current_conditions' % self.wll_ip
+        self.Real_Time_URL = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
+        self.current_conditions_url = f'http://{self.wll_ip}:80/v1/current_conditions'
 
-        self.txid_ISS  = stn_dict.get('ISS_id', 1)
+        # Make First Contact with WLL
+        response = make_request_using_socket(self.current_conditions_url)
+        data = response['data']
+
+        if response == None:
+            print('error')
+        elif data['conditions'][0]['lsid']:
+            self.lsid_iss = data['conditions'][0]['lsid']
+            loginf(f'ISS is using id: {self.lsid_iss}')
+
+        for condition in data['conditions']:
+
+        #for condition in response['conditions']:
+            if condition['lsid'] == 242741 and condition['data_structure_type'] == 1:
+
+                # Check current rain for the day and set it
+                self.rain_previous_period = condition["rainfall_daily"]
+
+                # Set Bucket Size
+                # rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")*
+                rain_collector_type = condition["rain_size"]
+
+                if 1 <= rain_collector_type <= 4:
+
+                    if rain_collector_type == 1:
+                        self.bucketSize = 0.01
+                        loginf(f'Bucketsize = 0.1 in')
+
+                    elif rain_collector_type == 2:
+                        self.bucketSize = 0.2 * MM2INCH
+                        loginf(f'Bucketsize = 0.2 mm')
+
+                    elif rain_collector_type == 3:
+                        self.bucketSize = 0.1 * MM2INCH
+                        loginf(f'Bucketsize = 0.1 mm')
+
+                    elif rain_collector_type == 4:
+                        self.bucketSize = 0.001
+                        loginf(f'Bucketsize = 0.001 in')
+
+                # Set current date.
+                self.PreviousDatestamp = datetime.date.fromtimestamp(data['ts'])
+                # Send to DEBUG
+                logdbg(f'Rain daily reset midnight: {str(self.PreviousDatestamp)}')
+                logdbg(f'Daily rain is set at: {(self.rain_previous_period)} buckets [{round(self.rain_previous_period * self.bucketSize * 25.4, 1)} mm / {round(self.rain_previous_period * self.bucketSize, 2)} in]')
+
+
+
+        ### self.txid_ISS  = stn_dict.get('ISS_id', 1)
         # self.txid_wind = stn_dict.get('wind_id', 1)         #not implemented yet
 
- #       self.last_rain_storm = None
- #       self.last_rain_storm_start_at = None
-
-        self.LaunchTime = time.time()
         self.UPD_CountDown = 0
-
-        self.rain_previous_period = None
 
 
     @property
     def hardware_name(self):
         return "WeatherLinkLiveUDP"
 
-
     def genLoopPackets(self):
 
+
+        # Start Loop
         while True:
-            try:
-                response = requests.get(self.CurrentConditions_URL)
-                # If the response was successful, no Exception will be raised
-                response.raise_for_status()
-            except HTTPError as http_err:
-                errormsg = ('HTTP error occurred: {http_err}')  # Python 3.6
-                loginf(errormsg)
 
-            except Exception as err:
-                errormsg = ('Other error occurred: {err}')  # Python 3.6
-                loginf(errormsg)
-
-            else:
-
-                CurrentConditions = response.json()
-                packet = self.DecodeDataWLL(CurrentConditions['data'])
-                yield packet
+            # Get Current Conditions
+            CurrentConditions = make_request_using_socket(self.current_conditions_url)
+            packet = self.DecodeDataWLL(CurrentConditions['data'])
+            yield packet
 
             # Check if UDP is still on
             self.Check_UDP_Broascast()
 
             # Set timer to listen to UDP
             self.timeout = time.time() + self.poll_interval
-            ## self.timeout = time.time() + 10
-
-
-
 
             # Listen for UDP Broadcast for the duration of the interval
             while time.time() < self.timeout:
                 data, wherefrom = comsocket.recvfrom(2048)
                 UDP_data = json.loads(data.decode("utf-8"))
                 if UDP_data["conditions"] == None:
-                    print(UDP_data["error"])
+                    logdbg(UDP_data["error"])
                 else:
                     packet = self.DecodeDataWLL(UDP_data)
                     # Yield UDP
@@ -174,146 +208,150 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
 
     def DecodeDataWLL(self, data):
+
         timestamp = data['ts']
-        packet = {'dateTime': timestamp, 'usUnits': weewx.US}
+
+        packet = {}
+        packet['dateTime'] =  timestamp
+        packet['usUnits'] = weewx.US
+
+        DavisDateStamp = datetime.date.fromtimestamp(timestamp)
 
         for condition in data['conditions']:
-            if condition["data_structure_type"] == 1 and condition['txid'] == 1:
+            if condition["lsid"] == 242741:
 
-                if "wind_speed_last" in condition:  # most recent valid wind speed **(mph)**
-                    packet.update({'windSpeed': condition["wind_speed_last"]})
+                packet['windSpeed'] = condition["wind_speed_last"]
 
-                if "wind_dir_last" in condition:  # most recent valid wind direction **(°degree)**
-                    packet.update({'windDir': condition["wind_dir_last"]})
 
-                if "wind_speed_hi_last_10_min" in condition:  # maximum wind speed over last 10 min **(mph)**
-                    packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
+                # #if "wind_speed_last" in condition:  # most recent valid wind speed **(mph)**
+                #     packet.update({'windSpeed': condition["wind_speed_last"]})
+                #
+                # #if "wind_dir_last" in condition:  # most recent valid wind direction **(°degree)**
+                #     packet.update({'windDir': condition["wind_dir_last"]})
+                packet['winDir'] = condition["wind_dir_last"]
+                #
+                # if "wind_speed_hi_last_10_min" in condition:  # maximum wind speed over last 10 min **(mph)**
+                #     packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
 
-                if "wind_dir_scalar_avg_last_10_min" in condition:  # gust wind direction over last 10 min **(°degree)**
-                    packet.update({'windGustDir': condition["wind_dir_scalar_avg_last_10_min"]})
+                packet['windGust'] = condition["wind_speed_hi_last_10_min"]
+                #
+                # if "wind_dir_scalar_avg_last_10_min" in condition:  # gust wind direction over last 10 min **(°degree)**
+                #     packet.update({'windGustDir': condition["wind_dir_scalar_avg_last_10_min"]})
+
+                packet['windGustDir'] = condition["wind_dir_at_hi_speed_last_10_min"]
 
                 if "temp" in condition:  # most recent valid temperature **(°F)**
-                    packet.update({'outTemp': condition['temp']})
+                    packet['outTemp'] = condition['temp']
+                #
+                # if "hum" in condition:  # most recent valid temperature **(°F)**
+                #     packet.update({'outHumidity': condition['hum']})
 
                 if "hum" in condition:  # most recent valid temperature **(°F)**
-                    packet.update({'outHumidity': condition['hum']})
+                    packet['outHumidity'] = condition['hum']
 
                 if "dew_point" in condition:  # **(°F)**
-                    packet.update({'dewpoint': condition['dew_point']})
+                #     packet.update({'dewpoint': condition['dew_point']})
+
+                    packet['dewpoint'] = condition['dew_point']
 
                 if "heat_index" in condition:  # **(°F)**
-                    packet.update({'heatindex': condition['heat_index']})
+                #     packet.update({'heatindex': condition['heat_index']})
+
+                    packet['heatindex'] = condition['heat_index']
 
                 if "wind_chill" in condition:  # **(°F)**
-                    packet.update({'windchill': condition['wind_chill']})
-
+                #     packet.update({'windchill': condition['wind_chill']})
+                    packet['windchill'] = condition['wind_chill']
+                #
                 if "solar_rad" in condition:  #
-                    packet.update({'radiation': condition['solar_rad']})
+                #     packet.update({'radiation': condition['solar_rad']})
+                    packet['radiation'] = condition['solar_rad']
 
                 if "uv_index" in condition:  #
-                    packet.update({'UV': condition['uv_index']})
-                if "trans_battery_flag" in condition:  #
-                    packet.update({'txBatteryStatus': condition['trans_battery_flag']})
+                #     packet.update({'UV': condition['uv_index']})
 
-                if "rx_state" in condition:
-                    packet.update({'signal1': condition['rx_state']})
+                    packet['UV'] = condition['uv_index']
+                # if "trans_battery_flag" in condition:  #
+                #     packet.update({'txBatteryStatus': condition['trans_battery_flag']})
+                #
+                # if "rx_state" in condition:
+                #     packet.update({'signal1': condition['rx_state']})
 
-                if "rain_size" in condition:  # rain collector type/size **(0: Reserved, 1: 0.01", 2: 0.2 mm, 3:  0.1 mm, 4: 0.001")**
+                rainFall_Daily = condition['rainfall_daily']
+                rainRate = condition['rain_rate_last']
 
-                    rain_collector_type = condition["rain_size"]
+                rain_this_period = 0
 
-                    if 1 <= rain_collector_type <= 4:
+                if DavisDateStamp > self.PreviousDatestamp:
+                    self.rain_previous_period = 0
+                    self.PreviousDatestamp = DavisDateStamp
+                    ## print(f'Prev Date: {str(self.PreviousDatestamp)}')
+                    logdbg('Midnight rain rest')
 
-                        if rain_collector_type == 1:
-                            bucketSize = 0.01
+                if rainFall_Daily is not None:
 
-                        elif rain_collector_type == 2:
-                            bucketSize = 0.2 * MM2INCH
-
-                        elif rain_collector_type == 3:
-                            bucketSize = 0.1
-
-                        elif rain_collector_type == 4:
-                            bucketSize = 0.001
-
-                        ####if "rain_rate_last" in condition:  # most recent valid rain rate **(counts/hour)**
-
-                        ##### RainRate_last = condition['rain_rate_last']
-                            ####packet.update({'rainRate': float(condition["rain_rate_last"]) * bucketSize})
-
-                        rainFall_Daily = condition['rainfall_daily']
-                        rainRate = condition['rain_rate_last']
-
-                        # Check current rain for the day and set it
-                        if self.rain_previous_period == None:
-                            self.rain_previous_period = rainFall_Daily
-                            logdbg(f'Daily rain is set at: {round(self.rain_previous_period)} buckets [{round(self.rain_previous_period * bucketSize * 25.4 ,1)} mm / {round(self.rain_previous_period * bucketSize ,2)} in]')
-
-                        # At midnight WLL resets rainfall_daily, so if it Less than the previous_period also reset
-                        #
-                        # Note: This is not perfect yet! e.g. it is raining at midnight 1 bucket, and the previous_period is
-                        # also 1 bucket. Using the 2.5 seconds UDP this is very unlikly, but with a non UDP polinterval of 300
-                        # it is possible.
-                        #
-                        if rainFall_Daily < self.rain_previous_period:
-                            self.rain_previous_period = 0
-                            logdbg('Midnight rain rest')
-
-                        if rainFall_Daily is not None:
-
-                            if self.rain_previous_period is not None:
-                                rain_this_period = (rainFall_Daily - self.rain_previous_period)
-                                self.rain_previous_period = rainFall_Daily
-                                if rain_this_period > 0:
-                                    logdbg(f'Rain this period: +{rain_this_period} buckets.[{round(rain_this_period * bucketSize * 25.4 ,1)} mm / {round(rain_this_period * bucketSize ,2)} in]')
-                                    logdbg(f'Set Previous period rain to: {self.rain_previous_period} buckets.[{round(self.rain_previous_period * bucketSize * 25.4 ,1)} mm / {round(self.rain_previous_period * bucketSize ,2)} in]')
+                    if self.rain_previous_period is not None:
+                        rain_this_period = (rainFall_Daily - self.rain_previous_period)
+                        self.rain_previous_period = rainFall_Daily
+                        if rain_this_period > 0:
+                            logdbg(f'Rain this period: +{rain_this_period} buckets.[{round(rain_this_period * self.bucketSize * 25.4 ,1)} mm / {round(rain_this_period * self.bucketSize ,2)} in]')
+                            logdbg(f'Set Previous period rain to: {self.rain_previous_period} buckets.[{round(self.rain_previous_period * self.bucketSize * 25.4 ,1)} mm / {round(self.rain_previous_period * self.bucketSize ,2)} in]')
 
 
-                        packet.update({'rain':  rain_this_period * bucketSize })
-                        packet.update({'rainRate': rainRate * bucketSize })
+                packet['rain'] = rain_this_period * self.bucketSize
+                packet['rainRate'] = rainRate * self.bucketSize
 
-            elif condition['data_structure_type'] == 3:
 
-                if "bar_sea_level" in condition:  # most recent bar sensor reading with elevation adjustment **(inches)**
-                    packet.update({'barometer': condition["bar_sea_level"]})
+            #elif condition['data_structure_type'] == 3:
 
-                if "bar_absolute" in condition:  # raw bar sensor reading **(inches)**
-                    packet.update({'pressure': condition["bar_absolute"]})
+                # if "bar_sea_level" in condition:  # most recent bar sensor reading with elevation adjustment **(inches)**
+                #     packet.update({'barometer': condition["bar_sea_level"]})
+                #
+                # if "bar_absolute" in condition:  # raw bar sensor reading **(inches)**
+                #     packet.update({'pressure': condition["bar_absolute"]})
 
             # 4 = LSS Temp/Hum Current Conditions record
-            elif condition['data_structure_type'] == 4:
+            #elif condition['data_structure_type'] == 4:
 
-                if "temp_in" in condition:  # most recent valid inside temp **(°F)**
-                    packet.update({'inTemp': condition["temp_in"]})
-
-                if "hum_in" in condition:  # most recent valid inside humidity **(%RH)**
-                    packet.update({'inHumidity': condition["hum_in"]})
-
-                if "dew_point_in" in condition:  # **(°F)**
-                    packet.update({'inDewpoint': condition["dew_point_in"]})
+                # if "temp_in" in condition:  # most recent valid inside temp **(°F)**
+                #     packet.update({'inTemp': condition["temp_in"]})
+                #
+                # if "hum_in" in condition:  # most recent valid inside humidity **(%RH)**
+                #     packet.update({'inHumidity': condition["hum_in"]})
+                #
+                # if "dew_point_in" in condition:  # **(°F)**
+                #     packet.update({'inDewpoint': condition["dew_point_in"]})
         return (packet)
 
     def Check_UDP_Broascast(self):
         if self.UPD_CountDown < time.time():
-            try:
-                response = requests.get(self.Real_Time_URL)
-                # If the response was successful, no Exception will be raised
-                response.raise_for_status()
-            except HTTPError as http_err:
-                errormsg = (f'HTTP error occurred: {http_err}')  # Python 3.6
-                loginf(errormsg)
+            response = make_request_using_socket(self.Real_Time_URL)
+            Req_data = response
+            ##print(Req_data)
+            self.UPD_CountDown = time.time() + Req_data['data']['duration']
+            loginf(f'UDP broadcast ends: {weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)}')
 
-            except Exception as err:
-                errormsg = (f'Other error occurred: {err}')  # Python 3.6
-                loginf(errormsg)
+def make_request_using_socket(url):
 
-            else:
-                Req_data = response.json()
-                print(Req_data)
-                self.UPD_CountDown = time.time() + Req_data['data']['duration']
-                loginf(f'UDP broadcast ends: {weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)}')
+    try:
+        retry_stratagey = Retry(total=3, backoff_factor=1)
 
+        adapter = HTTPAdapter(max_retries=retry_stratagey)
+        http = requests.Session()
+        http.mount("http://", adapter)
 
+        resp = http.get(url, timeout=3)
+        #####print(resp)
+        json_data = json.loads(resp.text)
+        if json_data["data"] == None:
+            print(json_data["error"])
+        else:
+            return (json_data)
+    except requests.Timeout as err:
+        print({"message": err})
+    except requests.RequestException as err:
+        # Max retries exceeded
+        print(f'RequestExeption: {err}')
 
 
 
