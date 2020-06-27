@@ -39,9 +39,9 @@ import weewx.drivers
 #import pprint
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2'
+DRIVER_VERSION = '0.2.1b'
 
-MM_TO_INCH = 0.0393701
+MM2INCH = 1/25.4
 
 DEFAULT_TCP_ADDR = '192.168.1.47'
 DEFAULT_POLL_INTERVALL = 10
@@ -116,11 +116,13 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         self.txid_ISS  = stn_dict.get('ISS_id', 1)
         # self.txid_wind = stn_dict.get('wind_id', 1)         #not implemented yet
 
-        self.last_rain_storm = None
-        self.last_rain_storm_start_at = None
+ #       self.last_rain_storm = None
+ #       self.last_rain_storm_start_at = None
 
         self.LaunchTime = time.time()
         self.UPD_CountDown = 0
+
+        self.rain_previous_period = None
 
 
     @property
@@ -155,6 +157,9 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
             # Set timer to listen to UDP
             self.timeout = time.time() + self.poll_interval
             ## self.timeout = time.time() + 10
+
+
+
 
             # Listen for UDP Broadcast for the duration of the interval
             while time.time() < self.timeout:
@@ -220,43 +225,53 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     if 1 <= rain_collector_type <= 4:
 
                         if rain_collector_type == 1:
-                            rain_count_size = 0.01
+                            bucketSize = 0.01
 
                         elif rain_collector_type == 2:
-                            rain_count_size = 0.2 * MM_TO_INCH
+                            bucketSize = 0.2 * MM2INCH
 
                         elif rain_collector_type == 3:
-                            rain_count_size = 0.1
+                            bucketSize = 0.1
 
                         elif rain_collector_type == 4:
-                            rain_count_size = 0.001 * MM_TO_INCH
+                            bucketSize = 0.001
 
-                        if "rain_rate_last" in condition:  # most recent valid rain rate **(counts/hour)**
-                            packet.update({'rainRate': float(condition["rain_rate_last"]) * rain_count_size})
+                        ####if "rain_rate_last" in condition:  # most recent valid rain rate **(counts/hour)**
 
-                        if "rain_storm" in condition and "rain_storm_start_at" in condition:
+                        ##### RainRate_last = condition['rain_rate_last']
+                            ####packet.update({'rainRate': float(condition["rain_rate_last"]) * bucketSize})
 
-                            # Calculate the rain accumulation by reading the total rain count and checking the increments
+                        rainFall_Daily = condition['rainfall_daily']
+                        rainRate = condition['rain_rate_last']
 
-                            rain_storm = condition[
-                                "rain_storm"]  # total rain count since last 24 hour long break in rain **(counts)**
-                            rain_storm_start_at = condition[
-                                "rain_storm_start_at"]  # UNIX timestamp of current rain storm start **(seconds)**
+                        # Check current rain for the day and set it
+                        if self.rain_previous_period == None:
+                            self.rain_previous_period = rainFall_Daily
+                            logdbg(f'Daily rain is set at: {round(self.rain_previous_period)} buckets [{round(self.rain_previous_period * bucketSize * 25.4 ,1)} mm / {round(self.rain_previous_period * bucketSize ,2)} in]')
 
-                            rain_count = 0.0
+                        # At midnight WLL resets rainfall_daily, so if it Less than the previous_period also reset
+                        #
+                        # Note: This is not perfect yet! e.g. it is raining at midnight 1 bucket, and the previous_period is
+                        # also 1 bucket. Using the 2.5 seconds UDP this is very unlikly, but with a non UDP polinterval of 300
+                        # it is possible.
+                        #
+                        if rainFall_Daily < self.rain_previous_period:
+                            self.rain_previous_period = 0
+                            logdbg('Midnight rain rest')
 
-                            if self.last_rain_storm is not None and self.last_rain_storm_start_at is not None:
+                        if rainFall_Daily is not None:
 
-                                if rain_storm_start_at != self.last_rain_storm_start_at:
-                                    rain_count = rain_storm
+                            if self.rain_previous_period is not None:
+                                rain_this_period = (rainFall_Daily - self.rain_previous_period)
+                                self.rain_previous_period = rainFall_Daily
+                                if rain_this_period > 0:
+                                    logdbg(f'Rain this period: +{rain_this_period} buckets.[{round(rain_this_period * bucketSize * 25.4 ,1)} mm / {round(rain_this_period * bucketSize ,2)} in]')
+                                    logdbg(f'Set Previous period rain to: {self.rain_previous_period} buckets.[{round(self.rain_previous_period * bucketSize * 25.4 ,1)} mm / {round(self.rain_previous_period * bucketSize ,2)} in]')
 
-                                elif rain_storm >= self.last_rain_storm:
-                                    rain_count = float(rain_storm) - float(self.last_rain_storm)
 
-                            self.last_rain_storm = rain_storm
-                            self.last_rain_storm_start_at = rain_storm_start_at
+                        packet.update({'rain':  rain_this_period * bucketSize })
+                        packet.update({'rainRate': rainRate * bucketSize })
 
-                            packet.update({'rain': rain_count * rain_count_size})
             elif condition['data_structure_type'] == 3:
 
                 if "bar_sea_level" in condition:  # most recent bar sensor reading with elevation adjustment **(inches)**
