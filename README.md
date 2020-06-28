@@ -18,9 +18,9 @@ wget -O weatherlinkliveudp.zip https://github.com/grebleem/WeatherLinkLiveUDP/ar
 
 ```
 sudo wee_extension --install weatherlinkliveudp.zip
-```
+``` 
 
-3) Set the `station_type` to `WeatherLinkLiveUDP` and modify the `[WeatherLinkLiveUDP]` stanza in `weewx.conf`:
+4) Set the `station_type` to `WeatherLinkLiveUDP` and modify the `[WeatherLinkLiveUDP]` stanza in `weewx.conf`. If there are multilple stations connected to the WLL do a `http://<wll_ip>:80/v1/real_time` in an browers and and look in the JSON for the correct `lsid`. Use this to set the `lsid_ss`. See the [Davis](https://weatherlink.github.io/weatherlink-live-local-api/) documentation for more information :
 ```
 [Station]
 
@@ -28,17 +28,19 @@ sudo wee_extension --install weatherlinkliveudp.zip
     station_type = WeatherLinkLiveUDP
 ```
 ```
+# Multiple transmitters e.g. extra ISS for wind, extra temp sensor, requires the lsid_iss
 [WeatherLinkLiveUDP]
     wll_ip = 192.168.1.47
-    poll_interval = 15    # number of seconds
-    ISS_id = 1
+    poll_interval = 10              # number of seconds
+    lsid_iss = 242741               # Optional
     driver = user.weatherlinkliveudp
 ```
 
 4) Restart WeeWX
 
 ```
-sudo systemctl restart weewx
+sudo systemctl stop weewx
+sudo systemctl start weewx
 ```
 
 Note: The driver requires the Python `requests` library. To install it:
