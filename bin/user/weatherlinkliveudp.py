@@ -47,7 +47,7 @@ import datetime
 
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.3b'
+DRIVER_VERSION = '0.2.4b'
 
 MM2INCH = 1/25.4
 
