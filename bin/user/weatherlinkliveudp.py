@@ -14,6 +14,9 @@
 #
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 #
+
+# todo: Implementation of multiple transmitters.
+#
 """
 
 Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for getting current weather data and can support continuous requests as often as every 10 seconds. Also it collects a real-time 2.5 sec broadcast for wind speed and rain over UDP port 22222.
@@ -35,18 +38,16 @@ import requests
 
 import json
 
-from requests.exceptions import HTTPError
+##from requests.exceptions import HTTPError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 import weewx.drivers
 import datetime
 
-## DEBUG ONLY
-#import pprint
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.2b'
+DRIVER_VERSION = '0.2.3b'
 
 MM2INCH = 1/25.4
 
@@ -105,16 +106,15 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.poll_interval = float(stn_dict.get('poll_interval', DEFAULT_POLL_INTERVALL))
         loginf('HTTP polling interval is %s' % self.poll_interval)
+        if self.poll_interval <10:
+            logerr('Unable to set Poll Interval (min. 10 s.)')
 
         self.wll_ip = stn_dict.get('wll_ip',DEFAULT_TCP_ADDR)
-        #print(self.wll_ip)
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
-        ##self.max_tries = int(stn_dict.get('max_tries', 5))
-        ###self.time_out = int(stn_dict.get('time_out', 10))
+        self.lsid_iss = stn_dict.get('self.lsid_iss')
 
-        self.StartTime = time.time()
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
         self.Real_Time_URL = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
@@ -126,13 +126,12 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         if response == None:
             print('error')
-        elif data['conditions'][0]['lsid']:
+        elif data['conditions'][0]['lsid'] and self.lsid_iss is None:
             self.lsid_iss = data['conditions'][0]['lsid']
             loginf(f'ISS is using id: {self.lsid_iss}')
 
         for condition in data['conditions']:
 
-        #for condition in response['conditions']:
             if condition['lsid'] == 242741 and condition['data_structure_type'] == 1:
 
                 # Check current rain for the day and set it
@@ -166,11 +165,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 logdbg(f'Rain daily reset midnight: {str(self.PreviousDatestamp)}')
                 logdbg(f'Daily rain is set at: {(self.rain_previous_period)} buckets [{round(self.rain_previous_period * self.bucketSize * 25.4, 1)} mm / {round(self.rain_previous_period * self.bucketSize, 2)} in]')
 
-
-
-        ### self.txid_ISS  = stn_dict.get('ISS_id', 1)
-        # self.txid_wind = stn_dict.get('wind_id', 1)         #not implemented yet
-
         self.UPD_CountDown = 0
 
 
@@ -179,7 +173,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         return "WeatherLinkLiveUDP"
 
     def genLoopPackets(self):
-
 
         # Start Loop
         while True:
@@ -218,7 +211,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         DavisDateStamp = datetime.date.fromtimestamp(timestamp)
 
         for condition in data['conditions']:
-            if condition["lsid"] == 242741:
+            if condition["lsid"] == self.lsid_iss:
 
                 packet['windSpeed'] = condition["wind_speed_last"]
 
@@ -269,7 +262,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
                 if "uv_index" in condition:  #
                 #     packet.update({'UV': condition['uv_index']})
-
                     packet['UV'] = condition['uv_index']
                 # if "trans_battery_flag" in condition:  #
                 #     packet.update({'txBatteryStatus': condition['trans_battery_flag']})
@@ -281,19 +273,20 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 rainRate = condition['rain_rate_last']
 
                 rain_this_period = 0
-
+                logdbg(f'Daily rain reset - next reset midnight {str(self.PreviousDatestamp)}')
                 if DavisDateStamp > self.PreviousDatestamp:
                     self.rain_previous_period = 0
                     self.PreviousDatestamp = DavisDateStamp
                     ## print(f'Prev Date: {str(self.PreviousDatestamp)}')
-                    logdbg('Midnight rain rest')
+                    logdbg(f'Daily rain reset - next reset midnight {str(self.PreviousDatestamp)}')
 
                 if rainFall_Daily is not None:
 
                     if self.rain_previous_period is not None:
                         rain_this_period = (rainFall_Daily - self.rain_previous_period)
-                        self.rain_previous_period = rainFall_Daily
+
                         if rain_this_period > 0:
+                            self.rain_previous_period = rainFall_Daily
                             logdbg(f'Rain this period: +{rain_this_period} buckets.[{round(rain_this_period * self.bucketSize * 25.4 ,1)} mm / {round(rain_this_period * self.bucketSize ,2)} in]')
                             logdbg(f'Set Previous period rain to: {self.rain_previous_period} buckets.[{round(self.rain_previous_period * self.bucketSize * 25.4 ,1)} mm / {round(self.rain_previous_period * self.bucketSize ,2)} in]')
 
@@ -302,25 +295,27 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 packet['rainRate'] = rainRate * self.bucketSize
 
 
-            #elif condition['data_structure_type'] == 3:
+            elif condition['data_structure_type'] == 3:
 
-                # if "bar_sea_level" in condition:  # most recent bar sensor reading with elevation adjustment **(inches)**
-                #     packet.update({'barometer': condition["bar_sea_level"]})
-                #
-                # if "bar_absolute" in condition:  # raw bar sensor reading **(inches)**
-                #     packet.update({'pressure': condition["bar_absolute"]})
+                if "bar_sea_level" in condition:  # most recent bar sensor reading with elevation adjustment **(inches)**
+                    packet['barometer'] = condition['bar_sea_level']
+                    #packet.update({'barometer': condition["bar_sea_level"]})
 
-            # 4 = LSS Temp/Hum Current Conditions record
-            #elif condition['data_structure_type'] == 4:
+                if "bar_absolute" in condition:  # raw bar sensor reading **(inches)**
+                    ##packet.update({'pressure': condition["bar_absolute"]})
+                    packet['pressure'] = condition['bar_absolute']
 
-                # if "temp_in" in condition:  # most recent valid inside temp **(°F)**
-                #     packet.update({'inTemp': condition["temp_in"]})
-                #
-                # if "hum_in" in condition:  # most recent valid inside humidity **(%RH)**
-                #     packet.update({'inHumidity': condition["hum_in"]})
-                #
-                # if "dew_point_in" in condition:  # **(°F)**
-                #     packet.update({'inDewpoint': condition["dew_point_in"]})
+            ## 4 = LSS Temp/Hum Current Conditions record
+            elif condition['data_structure_type'] == 4:
+
+                if "temp_in" in condition:  # most recent valid inside temp **(°F)**
+                    packet.update({'inTemp': condition["temp_in"]})
+
+                if "hum_in" in condition:  # most recent valid inside humidity **(%RH)**
+                    packet.update({'inHumidity': condition["hum_in"]})
+
+                if "dew_point_in" in condition:  # **(°F)**
+                    packet.update({'inDewpoint': condition["dew_point_in"]})
         return (packet)
 
     def Check_UDP_Broascast(self):
