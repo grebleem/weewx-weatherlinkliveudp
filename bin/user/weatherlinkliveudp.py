@@ -132,7 +132,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         for condition in data['conditions']:
 
-            if condition['lsid'] == 242741 and condition['data_structure_type'] == 1:
+            if condition['lsid'] == self.lsid_iss and condition['data_structure_type'] == 1:
 
                 # Check current rain for the day and set it
                 self.rain_previous_period = condition["rainfall_daily"]
