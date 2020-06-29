@@ -15,8 +15,6 @@
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 #
 
-# todo: Implementation of multiple transmitters.
-
 """
 
 Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for getting current weather data and can support continuous requests as often as every 10 seconds. Also it collects a real-time 2.5 sec broadcast for wind speed and rain over UDP port 22222.
@@ -26,8 +24,6 @@ See Davis weatherlink-live-local-api
 
 """
 
-
-#### TO DO FIRST TCP SHOULD BE CORRECT AND GIVE TIME
 
 from __future__ import with_statement
 
@@ -47,7 +43,7 @@ import datetime
 
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.4b'
+DRIVER_VERSION = '0.2.4'
 
 MM2INCH = 1/25.4
 
