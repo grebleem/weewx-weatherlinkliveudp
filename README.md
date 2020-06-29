@@ -8,6 +8,7 @@ To see a live demo of this plugin in vist [meteo-otterlo.nl](https://meteo-otter
 
 ### Installation
 
+
 1) Download the driver
 
 ```
@@ -28,7 +29,7 @@ sudo wee_extension --install weatherlinkliveudp.zip
     station_type = WeatherLinkLiveUDP
 ```
 ```
-# Multiple transmitters e.g. extra ISS for wind, extra temp sensor, requires the lsid_iss
+The WLL can get dat from up to eight transmitters. If multiple transmitters e.g. extra ISS for wind, extra temp sensor, requires the lsid_iss
 [WeatherLinkLiveUDP]
     wll_ip = 192.168.1.47
     poll_interval = 10              # number of seconds
