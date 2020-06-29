@@ -43,9 +43,10 @@ def make_request_using_socket(url):
 def main():
     global current_conditions_url
     while 1:
-        data = make_request_using_socket(current_conditions_url)
-        print(data)
-
+        r = make_request_using_socket(current_conditions_url)
+        data = r['data']
+        if r.get('ts'):
+            print (data['ts'])
 
 
 
