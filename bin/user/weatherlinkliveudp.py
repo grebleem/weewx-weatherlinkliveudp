@@ -14,6 +14,7 @@
 #
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 #
+# DEVELOPMENT
 
 # todo: Implementation of multiple transmitters.
 
@@ -50,9 +51,6 @@ DRIVER_NAME = 'WeatherLinkLiveUDP'
 DRIVER_VERSION = '0.2.4b'
 
 MM2INCH = 1/25.4
-
-DEFAULT_TCP_ADDR = '192.168.1.47'
-DEFAULT_POLL_INTERVALL = 10
 
 # Open UDP Socket
 comsocket = socket(AF_INET, SOCK_DGRAM)
@@ -104,16 +102,21 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         # Show Diver version
         loginf('WLL UDP driver version is %s' % DRIVER_VERSION)
 
-        self.poll_interval = float(stn_dict.get('poll_interval', DEFAULT_POLL_INTERVALL))
+        self.poll_interval = float(stn_dict.get('poll_interval', 10))
         loginf('HTTP polling interval is %s' % self.poll_interval)
         if self.poll_interval <10:
             logerr('Unable to set Poll Interval (min. 10 s.)')
 
-        self.wll_ip = stn_dict.get('wll_ip',DEFAULT_TCP_ADDR)
+        self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
-        self.lsid_iss = stn_dict.get('self.lsid_iss')
+        self.lsid_iss = stn_dict.get('lsid_iss', 242741)
+
+        self.extra1 = stn_dict.get('extra_id')
+
+        if self.extra1:
+            loginf(f'Extra sensor is using id: {self.extra1}')
 
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
@@ -164,6 +167,8 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 # Send to DEBUG
                 logdbg(f'Rain daily reset midnight: {str(self.PreviousDatestamp)}')
                 logdbg(f'Daily rain is set at: {(self.rain_previous_period)} buckets [{round(self.rain_previous_period * self.bucketSize * 25.4, 1)} mm / {round(self.rain_previous_period * self.bucketSize, 2)} in]')
+
+
 
         self.UPD_CountDown = 0
 
@@ -273,7 +278,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 rainRate = condition['rain_rate_last']
 
                 rain_this_period = 0
-                logdbg(f'Daily rain reset - next reset midnight {str(self.PreviousDatestamp)}')
                 if DavisDateStamp > self.PreviousDatestamp:
                     self.rain_previous_period = 0
                     self.PreviousDatestamp = DavisDateStamp
@@ -316,6 +320,10 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
                 if "dew_point_in" in condition:  # **(°F)**
                     packet.update({'inDewpoint': condition["dew_point_in"]})
+
+            elif self.extra1:
+                logdbg("To DO: Logging extra Sensor")
+                #todo: Extra sensor
         return (packet)
 
     def Check_UDP_Broascast(self):
