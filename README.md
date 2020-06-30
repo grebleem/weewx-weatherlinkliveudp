@@ -28,7 +28,7 @@ sudo wee_extension --install weatherlinkliveudp.zip
     station_type = WeatherLinkLiveUDP
 ```
 If you have a separate wind transmitter, set up according to Davis Instruments recommendations: [How do I setup the weather link live to use a separate wind transmitter](https://support.davisinstruments.com/article/88ogxjf2mm-how-do-i-setup-the-weather-link-live-to-use-a-separate-wind-transmitter).
-The support for extra temp, soil e.g. will be added soon.
+The support for extra temp sensor e.g. will be added soon.
 ```
 # The WLL can get dat from up to eight transmitters. If multiple transmitters e.g. extra ISS for wind, extra temp sensor, requires the lsid_iss
 [WeatherLinkLiveUDP]
