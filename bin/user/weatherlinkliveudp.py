@@ -345,7 +345,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.station.set_poll_interval(float(stn_dict.get('poll_interval', 10)))
 
-        self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
+        self.wll_ip = stn_dict.get('wll_ip', '192.168.1.45')
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
@@ -358,12 +358,13 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         # Make First Contact with WLL
         response = make_request_using_socket(self.station.current_conditions_url)
-        data = response['data']
+
 
         if response == None:
             logerr('Unable to connect to Weather Link Live')
         elif response.get('data'):
 
+            data = response['data']
             ## self.station.set_txid(self.station.txid_iss)
             main_condition = data['conditions'][0]
             self.station.set_txid( data['conditions'][0]['txid'])
@@ -388,26 +389,29 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         while True:
 
             # Get Current Conditions
-            CurrentConditions = make_request_using_socket(self.station.current_conditions_url)
-            packet = self.station.DecodeDataWLL(CurrentConditions['data'])
-            yield packet
+            try:
+                CurrentConditions = make_request_using_socket(self.station.current_conditions_url)
+                packet = self.station.DecodeDataWLL(CurrentConditions['data'])
+                yield packet
 
-            # Check if UDP is still on
-            self.station.Check_UDP_Broascast()
+                # Check if UDP is still on
+                self.station.Check_UDP_Broascast()
 
-            # Set timer to listen to UDP
-            self.timeout = time.time() + self.station.poll_interval
+                # Set timer to listen to UDP
+                self.timeout = time.time() + self.station.poll_interval
 
-            # Listen for UDP Broadcast for the duration of the interval
-            while time.time() < self.timeout:
-                data, wherefrom = comsocket.recvfrom(2048)
-                UDP_data = json.loads(data.decode("utf-8"))
-                if UDP_data["conditions"] == None:
-                    logdbg(UDP_data["error"])
-                else:
-                    packet = self.station.DecodeDataWLL(UDP_data)
-                    # Yield UDP
-                    yield packet
+                # Listen for UDP Broadcast for the duration of the interval
+                while time.time() < self.timeout:
+                    data, wherefrom = comsocket.recvfrom(2048)
+                    UDP_data = json.loads(data.decode("utf-8"))
+                    if UDP_data["conditions"] == None:
+                        logdbg(UDP_data["error"])
+                    else:
+                        packet = self.station.DecodeDataWLL(UDP_data)
+                        # Yield UDP
+                        yield packet
+            except:
+                logerr('Unable to receive data from weather link live.')
 
 
 def make_request_using_socket(url):
