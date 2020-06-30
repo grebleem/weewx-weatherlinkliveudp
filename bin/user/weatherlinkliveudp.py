@@ -50,13 +50,11 @@ import weeutil.weeutil
 import random
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.4b'
+DRIVER_VERSION = '0.2.5b'
 
 MM2INCH = 1/25.4
 
-#####
-RAIN_SIMULATOR = False
-#####
+
 # Open UDP Socket
 comsocket = socket(AF_INET, SOCK_DGRAM)
 comsocket.bind(('', 22222))
@@ -98,39 +96,10 @@ except ImportError:
 def loader(config_dict, engine):
     return WeatherLinkLiveUDPDriver(**config_dict[DRIVER_NAME])
 
-class RainSimulator:
-    def __init__(self):
-        self.daily = 0
-        self.rain_list = [0, 0, 0, 1, 1, 2, 3]
-
-        self.last_day = datetime.datetime.now().day
-        self.timer = time.time() + 30
-
-    def drop_rain(self):
-        if self.timer < time.time():
-            self.print_warning()
-
-            raindom_bucket_tip = random.choice(self.rain_list)
-            self.daily = self.daily + raindom_bucket_tip
-            logdbg(f'RAIN SIM: {weeutil.weeutil.timestamp_to_string(time.time())} {raindom_bucket_tip} Bucket -> Total: {self.daily}')
-            self.timer = time.time() + random.randint(20, 90)
-            logdbg(f'RAIN SIM: Next bucket drop at {weeutil.weeutil.timestamp_to_string(self.timer)}')
-        # Reset daily at midnight
-
-        if datetime.datetime.now().day != self.last_day:
-            self.daily = 0
-            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Simulator RESET')
-            self.last_day = datetime.datetime.now().day
-
-
-    def print_warning(self):
-        logerr('************* RAIN IS FAKE ***************')
-
 
 class RainBarrel:
     def __init__(self):
         self.bucketsize = 0.0
-        #####self.rain_fall_daily = 0
         self.rain_previous_period = 0
         self.previous_day = None
 
@@ -186,11 +155,6 @@ class WWLstation():
         self.UPD_CountDown = 0
 
     rainbarrel = RainBarrel()
-
-    if RAIN_SIMULATOR:
-        rainsimulator = RainSimulator()
-
-
 
     def set_poll_interval(self,data):
         self.poll_interval = data
@@ -257,16 +221,14 @@ class WWLstation():
             packet['windGustDir'] = iss_udp_data["wind_dir_at_hi_speed_last_10_min"]
 
             # Rain
-            if not RAIN_SIMULATOR:
-                self.rainbarrel.rain = iss_udp_data['rainfall_daily']
-                packet['rainRate'] = iss_udp_data['rain_rate_last'] * self.rainbarrel.bucketsize
-
-            if RAIN_SIMULATOR:
-                self.rainbarrel.rain = self.rainsimulator.daily
+            self.rainbarrel.rain = iss_udp_data['rainfall_daily']
+            packet['rainRate'] = iss_udp_data['rain_rate_last'] * self.rainbarrel.bucketsize
 
             self.CalculateRain()
 
             packet['rain'] = self.davis_packet['rain']
+            if packet['rain'] > 0:
+                logdbg(f"UDP rain detect: {packet['rain']/self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
 
 
@@ -312,19 +274,14 @@ class WWLstation():
             packet['signal1'] = iss_data['rx_state']
 
 
-            if not RAIN_SIMULATOR:
-                self.rainbarrel.rain = iss_data['rainfall_daily']
-                packet['rainRate'] = iss_data['rain_rate_last'] * self.rainbarrel.bucketsize
-
-            if RAIN_SIMULATOR:
-                self.rainbarrel.rain = self.rainsimulator.daily
+            self.rainbarrel.rain = iss_data['rainfall_daily']
+            packet['rainRate'] = iss_data['rain_rate_last'] * self.rainbarrel.bucketsize
 
             self.CalculateRain()
 
             packet['rain'] = self.davis_packet['rain']
             if packet['rain'] > 0:
-                print('================= RAIN =================')
-                print(f"HTTP rain {packet['rain']/self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
+                logdbg(f"HTTP rain detect: {packet['rain']/self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
         if LSS_BAR_data:
             # most recent bar sensor reading with elevation adjustment **(inches)**
@@ -342,17 +299,12 @@ class WWLstation():
 
     def CalculateRain(self):
 
-        ####### RAIN_SIMULATOR:
-        #### Origonal:
-        #if self.davis_date_stamp.day != self.rainbarrel.previous_date_stamp.day:
-        if self.rainsimulator.last_day != self.rainbarrel.previous_date_stamp.day:
+        if self.davis_date_stamp.day != self.rainbarrel.previous_date_stamp.day:
             self.rainbarrel.previous_date_stamp = self.davis_date_stamp
             # Reset Previous rain at Midnight
             self.rainbarrel.set_rain_previous_period(0)
+            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp.day)}')
 
-            logdbg(
-                f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp.day)}')
-            ##### self.rainbarrel.set_rain_fall_daily(0)
 
 
 
@@ -397,7 +349,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
-        ##self.station.txid_iss = stn_dict.get('txid_iss')
 
         self.station.set_extra1(stn_dict.get('extra_id'))
 
@@ -422,13 +373,9 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
             # Check current rain for the day and set it
             self.station.rainbarrel.set_rain_previous_period(main_condition['rainfall_daily'])
-            if RAIN_SIMULATOR:
-                self.station.rainsimulator.daily = main_condition['rainfall_daily']
 
             # Set date for previous rain
             self.station.rainbarrel.set_rain_previous_date(datetime.datetime.fromtimestamp(data['ts']))
-
-
 
 
     @property
@@ -439,9 +386,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         # Start Loop
         while True:
-            ######
-            if RAIN_SIMULATOR:
-                self.station.rainsimulator.drop_rain()
 
             # Get Current Conditions
             CurrentConditions = make_request_using_socket(self.station.current_conditions_url)
