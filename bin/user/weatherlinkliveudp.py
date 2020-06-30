@@ -217,7 +217,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 #
                 # #if "wind_dir_last" in condition:  # most recent valid wind direction **(°degree)**
                 #     packet.update({'windDir': condition["wind_dir_last"]})
-                packet['winDir'] = condition["wind_dir_last"]
+                packet['windDir'] = condition["wind_dir_last"]
                 #
                 # if "wind_speed_hi_last_10_min" in condition:  # maximum wind speed over last 10 min **(mph)**
                 #     packet.update({'windGust': condition["wind_speed_hi_last_10_min"]})
