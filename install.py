@@ -10,15 +10,14 @@ def loader():
 class weatherlinkliveudpInstaller(ExtensionInstaller):
     def __init__(self):
         super(weatherlinkliveudpInstaller, self).__init__(
-            version='0.2.4',
-            name='weatherlinkliveudp',
+            version='0.2.5b',
+            name='WeatherLinkLiveUDP',
             description='Periodically poll weather data from a WeatherLink Live device',
             author="Bastiaan Meelberg",
             config={
                 'weatherlinkliveudp': {
                     'wll_ip': '1.2.3.4',
-                    'poll_interval': 15,
-                    'ISS_id': 1,
+                    'poll_interval': 30,
                     'driver': 'user.weatherlinkliveudp'
                 }
             },
