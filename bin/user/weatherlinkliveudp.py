@@ -43,7 +43,7 @@ import datetime
 import weeutil.weeutil
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.6b'
+DRIVER_VERSION = '0.2.6'
 
 MM2INCH = 1 / 25.4
 

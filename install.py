@@ -10,7 +10,7 @@ def loader():
 class weatherlinkliveudpInstaller(ExtensionInstaller):
     def __init__(self):
         super(weatherlinkliveudpInstaller, self).__init__(
-            version='0.2.5b',
+            version='0.2.6',
             name='WeatherLinkLiveUDP',
             description='Periodically poll weather data from a WeatherLink Live device',
             author="Bastiaan Meelberg",
