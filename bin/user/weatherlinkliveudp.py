@@ -363,7 +363,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
-        self.station.set_extra1(stn_dict.get('extra_id', 4))
+        self.station.set_extra1(stn_dict.get('extra_id'))
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
         self.station.real_rime_url = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
