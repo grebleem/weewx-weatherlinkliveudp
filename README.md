@@ -28,11 +28,12 @@ sudo wee_extension --install weatherlinkliveudp.zip
     station_type = WeatherLinkLiveUDP
 ```
 If you have a separate wind transmitter, set up according to Davis Instruments recommendations: [How do I setup the weather link live to use a separate wind transmitter](https://support.davisinstruments.com/article/88ogxjf2mm-how-do-i-setup-the-weather-link-live-to-use-a-separate-wind-transmitter).
-The support for extra temp sensor e.g. will be added soon.
+Where `wll_ip = 1.2.3.4` is the ip address of the WLL.
+For logging extra senors just add the transition id to the stanza by adding `extra_id = x`, where x is the id. Just one sensor recording temperature and humidity is supported for now.
 ```
 # The WLL can get dat from up to eight transmitters. If multiple transmitters e.g. extra ISS for wind, extra temp sensor, requires the lsid_iss
 [WeatherLinkLiveUDP]
-    wll_ip = 192.168.1.47
+    wll_ip = 1.2.3.4
     poll_interval = 10              # number of seconds [minimal 10 sec.]
     driver = user.weatherlinkliveudp
 ```
