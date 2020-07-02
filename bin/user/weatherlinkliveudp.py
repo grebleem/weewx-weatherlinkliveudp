@@ -21,6 +21,7 @@ Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for 
 
 See Davis weatherlink-live-local-api
 
+
 """
 
 
@@ -282,8 +283,8 @@ class WWLstation():
 
             self.calculate_rain()
 
-            packet['rain'] = self.davis_packet['rain']
-            if packet['rain'] > 0:
+            # packet['rain'] = self.davis_packet['rain']
+            if self.davis_packet['rain'] > 0:
                 logdbg(f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
         if lss_bar_data:
@@ -358,7 +359,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
-        self.station.set_extra1(stn_dict.get('extra_id',3))
+        self.station.set_extra1(stn_dict.get('extra_id'))
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
         self.station.real_rime_url = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
@@ -390,8 +391,8 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         return "WeatherLinkLiveUDP"
 
     def genLoopPackets(self):
-        # Start Loop
 
+        # Start Loop
         while True:
             # Get Current Conditions
             current_conditions = make_request_using_socket(self.station.current_conditions_url)
