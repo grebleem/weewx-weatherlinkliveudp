@@ -164,15 +164,16 @@ class WWLstation():
         loginf('HTTP polling interval is %s' % self.poll_interval)
 
     def set_txid(self, data):
-        self.txid_iss = data
-        loginf(f'tx id of ISS is {self.txid_iss}')
+        if data:
+            self.txid_iss = int(data)
+            loginf(f'tx id of ISS is {self.txid_iss}')
 
     def set_extra1(self, data):
-        self.extra1 = data
-        if self.extra1:
+        if data:
+            self.extra1 = int(data)
             loginf(f'Extra sensor is using id: {self.extra1}')
 
-    def DecodeDataWLL(self, data):
+    def decode_data_wll(self, data):
 
         iss_data = None
         leaf_soil_data = None
@@ -233,8 +234,8 @@ class WWLstation():
 
             self.calculate_rain()
 
-            # packet['rain'] = self.davis_packet['rain']
-            if self.davis_packet['rain'] > 0:
+            packet['rain'] = self.davis_packet['rain']
+            if packet['rain'] > 0:
                 logdbg(f"UDP rain detect: {self.davis_packet['rain'] / self.rainbarrel.bucketsize} buckets -> {self.davis_packet['rain']} in")
 
         # Get HTTP data
@@ -283,8 +284,8 @@ class WWLstation():
 
             self.calculate_rain()
 
-            # packet['rain'] = self.davis_packet['rain']
-            if self.davis_packet['rain'] > 0:
+            packet['rain'] = self.davis_packet['rain']
+            if packet['rain'] > 0:
                 logdbg(f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
         if lss_bar_data:
@@ -399,7 +400,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
             if current_conditions is None:
                 logerr('No current conditions from wll. Check ip address.')
             elif current_conditions.get('data'):
-                packet = self.station.DecodeDataWLL(current_conditions['data'])
+                packet = self.station.decode_data_wll(current_conditions['data'])
                 yield packet
 
             # Check if UDP is still on
@@ -415,7 +416,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 if UDP_data["conditions"] is None:
                     logdbg(UDP_data["error"])
                 else:
-                    packet =self.station.DecodeDataWLL(UDP_data)
+                    packet =self.station.decode_data_wll(UDP_data)
                     # Yield UDP
                     yield packet
 
