@@ -172,7 +172,6 @@ class WWLstation():
             self.extra1 = int(data)
         if self.extra1:
             loginf(f'Extra sensor is using id: {self.extra1}')
-            ##print(f'Extra sensor is using id: {self.extra1}')
 
     def DecodeDataWLL(self, data):
 
@@ -214,7 +213,6 @@ class WWLstation():
 
             # If extra sensor are requested, try to find them
             if self.extra1 and condition.get('txid') == self.extra1:
-                ## print("EXTRA DATA")
                 extra_data1 = condition
 
         # Get UDP data
@@ -237,7 +235,7 @@ class WWLstation():
 
             self.calculate_rain()
 
-            # packet['rain'] = self.davis_packet['rain']
+            packet['rain'] = self.davis_packet['rain']
             if self.davis_packet['rain'] > 0:
                 logdbg(f"UDP rain detect: {self.davis_packet['rain'] / self.rainbarrel.bucketsize} buckets -> {self.davis_packet['rain']} in")
 
@@ -287,7 +285,7 @@ class WWLstation():
 
             self.calculate_rain()
 
-            # packet['rain'] = self.davis_packet['rain']
+            packet['rain'] = self.davis_packet['rain']
             if self.davis_packet['rain'] > 0:
                 logdbg(f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
@@ -307,7 +305,6 @@ class WWLstation():
         if extra_data1:
             if extra_data1.get('temp'):
                 packet['extraTemp1'] = extra_data1['temp']
-                ###print(f"Extra Sensor {packet['extraTemp1']}")
             if extra_data1.get('hum'):
                 packet['extraHumid1'] = extra_data1['hum']
 
