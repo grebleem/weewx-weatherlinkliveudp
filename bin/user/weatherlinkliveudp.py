@@ -282,8 +282,8 @@ class WWLstation():
 
             self.calculate_rain()
 
-            # packet['rain'] = self.davis_packet['rain']
-            if self.davis_packet['rain'] > 0:
+            packet['rain'] = self.davis_packet['rain']
+            if packet['rain'] > 0:
                 logdbg(f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
         if lss_bar_data:
