@@ -168,9 +168,11 @@ class WWLstation():
         loginf(f'tx id of ISS is {self.txid_iss}')
 
     def set_extra1(self, data):
-        self.extra1 = data
+        if data:
+            self.extra1 = int(data)
         if self.extra1:
             loginf(f'Extra sensor is using id: {self.extra1}')
+            ##print(f'Extra sensor is using id: {self.extra1}')
 
     def DecodeDataWLL(self, data):
 
@@ -188,6 +190,7 @@ class WWLstation():
 
         packet['dateTime'] = timestamp
         packet['usUnits'] = weewx.US
+
 
         for condition in data['conditions']:
             # 1 = ISS Current Conditions record
@@ -211,6 +214,7 @@ class WWLstation():
 
             # If extra sensor are requested, try to find them
             if self.extra1 and condition.get('txid') == self.extra1:
+                ## print("EXTRA DATA")
                 extra_data1 = condition
 
         # Get UDP data
@@ -303,6 +307,7 @@ class WWLstation():
         if extra_data1:
             if extra_data1.get('temp'):
                 packet['extraTemp1'] = extra_data1['temp']
+                ###print(f"Extra Sensor {packet['extraTemp1']}")
             if extra_data1.get('hum'):
                 packet['extraHumid1'] = extra_data1['hum']
 
@@ -395,6 +400,11 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         # Start Loop
         while True:
             # Get Current Conditions
+
+            # with open('current3.json') as f:
+            #     data_file_data = json.load(f)
+            # packet = self.station.DecodeDataWLL(data_file_data['data'])
+            # yield packet
             current_conditions = make_request_using_socket(self.station.current_conditions_url)
             if current_conditions is None:
                 logerr('No current conditions from wll. Check ip address.')
