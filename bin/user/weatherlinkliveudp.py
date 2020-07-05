@@ -21,20 +21,18 @@ Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for 
 
 See Davis weatherlink-live-local-api
 
-
 """
 
 
 from __future__ import with_statement
 
-from socket import *
+import socket
+from socket import AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_BROADCAST
 import time
 
 import requests
-
 import json
 
-# from requests.exceptions import HTTPError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
@@ -43,14 +41,15 @@ import datetime
 import weeutil.weeutil
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.6'
+DRIVER_VERSION = '0.2.7b'
 
 MM2INCH = 1 / 25.4
 
 # Open UDP Socket
-comsocket = socket(AF_INET, SOCK_DGRAM)
+comsocket = socket.socket(AF_INET, SOCK_DGRAM)
 comsocket.bind(('', 22222))
 comsocket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+comsocket.settimeout(5)
 
 try:
     # Test for WeeWX v4 logging
@@ -153,7 +152,7 @@ class WWLstation():
 
         self.davis_packet = dict()
         self.davis_packet['rain'] = 0
-        self.UPD_CountDown = 0
+        self.udp_countdown = 0
 
     rainbarrel = RainBarrel()
 
@@ -290,7 +289,7 @@ class WWLstation():
 
         if lss_bar_data:
             # most recent bar sensor reading with elevation adjustment **(inches)**
-            packet['barometer'] = lss_bar_data['bar_sea_level']
+            packet['altimeter'] = lss_bar_data['bar_sea_level']
             packet['pressure'] = lss_bar_data['bar_absolute']
 
         if lss_temp_hum_data:
@@ -332,19 +331,18 @@ class WWLstation():
         self.davis_packet['rain'] = rain_now * self.rainbarrel.bucketsize
 
     def check_udp_broascast(self):
-        if self.UPD_CountDown < time.time():
+        if (self.udp_countdown - 360) < time.time():
             response = make_request_using_socket(self.real_rime_url)
             if response is None:
                 logerr('Unable to connect to Weather Link Live')
             elif response.get('data'):
                 Req_data = response
-                self.UPD_CountDown = time.time() + Req_data['data']['duration']
-                loginf(f'UDP broadcast ends: {weeutil.weeutil.timestamp_to_string(self.UPD_CountDown)}')
+                self.udp_countdown = time.time() + Req_data['data']['duration']
+                loginf(f'UDP check at: {weeutil.weeutil.timestamp_to_string(self.udp_countdown)}')
 
 
 class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
     """weewx driver that reads data from a WeatherLink Live
-
     """
 
     def __init__(self, **stn_dict):
@@ -409,17 +407,22 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
             # Set timer to listen to UDP
             self.timeout = time.time() + self.station.poll_interval
 
-            # Listen for UDP Broadcast for the duration of the interval
+            # Listen for UDP Broadcast for the duration of the poll interval
             while time.time() < self.timeout:
-                data, wherefrom = comsocket.recvfrom(2048)
-                UDP_data = json.loads(data.decode("utf-8"))
-                if UDP_data["conditions"] is None:
-                    logdbg(UDP_data["error"])
-                else:
-                    packet =self.station.decode_data_wll(UDP_data)
-                    # Yield UDP
-                    yield packet
-
+                try:
+                    data, wherefrom = comsocket.recvfrom(2048)
+                    UDP_data = json.loads(data.decode("utf-8"))
+                    if UDP_data["conditions"] is None:
+                        logdbg(UDP_data["error"])
+                    else:
+                        packet =self.station.decode_data_wll(UDP_data)
+                        # Yield UDP
+                        yield packet
+                except socket.timeout:
+                    logerr('UDP Socket Time Out')
+                    # Reset Countdown to Switch UDP back on.
+                    self.station.udp_countdown = 0
+                    self.station.check_udp_broascast()
 
 
 def make_request_using_socket(url):
