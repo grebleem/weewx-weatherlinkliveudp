@@ -289,7 +289,7 @@ class WWLstation():
 
         if lss_bar_data:
             # most recent bar sensor reading with elevation adjustment **(inches)**
-            packet['altimeter'] = lss_bar_data['bar_sea_level']
+            packet['barometer'] = lss_bar_data['bar_sea_level']
             packet['pressure'] = lss_bar_data['bar_absolute']
 
         if lss_temp_hum_data:
