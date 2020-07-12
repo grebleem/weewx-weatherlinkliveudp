@@ -110,7 +110,7 @@ class RainBarrel:
 
             if type == 1:
                 self.bucketsize = 0.01
-                logdbg(f'Bucketsize is set at 0.1 in')
+                logdbg(f'Bucketsize is set at 0.01 in')
 
             elif type == 2:
                 self.bucketsize = 0.2 * MM2INCH
