@@ -41,7 +41,7 @@ import datetime
 import weeutil.weeutil
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.7b'
+DRIVER_VERSION = '0.2.7'
 
 MM2INCH = 1 / 25.4
 
@@ -110,7 +110,7 @@ class RainBarrel:
 
             if type == 1:
                 self.bucketsize = 0.01
-                logdbg(f'Bucketsize is set at 0.1 in')
+                logdbg(f'Bucketsize is set at 0.01 in')
 
             elif type == 2:
                 self.bucketsize = 0.2 * MM2INCH
@@ -146,6 +146,7 @@ class WWLstation():
         self.extra1 = None
 
         self.davis_date_stamp = None
+        self.system_date_stamp = None
 
         self.real_rime_url = None
         self.current_conditions_url = None
@@ -181,8 +182,11 @@ class WWLstation():
         iss_udp_data = None
         extra_data1 = None
 
+        self.current_davis_data = data
+
         timestamp = data['ts']
         self.davis_date_stamp = datetime.datetime.fromtimestamp(timestamp)
+        self.system_date_stamp = datetime.datetime.now()
 
         packet = dict()
 
@@ -221,11 +225,12 @@ class WWLstation():
             # most recent valid wind direction **(°degree)**
             packet['windDir'] = iss_udp_data['wind_dir_last']
 
+
             # maximum wind speed over last 10 min **(mph)**
-            packet['windGust'] = iss_udp_data['wind_speed_hi_last_10_min']
+            # packet['windGust'] = iss_udp_data['wind_speed_hi_last_10_min']
 
             # gust wind direction over last 10 min **(°degree)**
-            packet['windGustDir'] = iss_udp_data["wind_dir_at_hi_speed_last_10_min"]
+            # packet['windGustDir'] = iss_udp_data["wind_dir_at_hi_speed_last_10_min"]
 
             # Rain
             self.rainbarrel.rain = iss_udp_data['rainfall_daily']
@@ -234,6 +239,7 @@ class WWLstation():
             self.calculate_rain()
 
             packet['rain'] = self.davis_packet['rain']
+
             if packet['rain'] > 0:
                 logdbg(f"UDP rain detect: {self.davis_packet['rain'] / self.rainbarrel.bucketsize} buckets -> {self.davis_packet['rain']} in")
 
@@ -245,11 +251,11 @@ class WWLstation():
             # most recent valid wind direction **(°degree)**
             packet['windDir'] = iss_data['wind_dir_last']
 
-            # maximum wind speed over last 10 min **(mph)**
-            packet['windGust'] = iss_data['wind_speed_hi_last_10_min']
+            # maximum wind speed over last 2 min **(mph)**
+            packet['windGust'] = iss_data['wind_speed_hi_last_2_min']
 
-            # gust wind direction over last 10 min **(°degree)**
-            packet['windGustDir'] = iss_data["wind_dir_at_hi_speed_last_10_min"]
+            # gust wind direction over last 2 min **(°degree)**
+            packet['windGustDir'] = iss_data["wind_dir_at_hi_speed_last_2_min"]
 
             # most recent valid temperature **(°F)**
             packet['outTemp'] = iss_data['temp']
@@ -311,13 +317,22 @@ class WWLstation():
     def calculate_rain(self):
 
         if self.davis_date_stamp.day != self.rainbarrel.previous_date_stamp.day:
-            self.rainbarrel.previous_date_stamp = self.davis_date_stamp
+            logdbg(self.current_davis_data)
             # Reset Previous rain at Midnight
+            logdbg(f'Previous: {self.rainbarrel.previous_date_stamp}')
+            logdbg(f'Davis:   {self.davis_date_stamp}')
+            logdbg(f'System:   {self.system_date_stamp}')
+            logdbg(f'daily rain Davis:     {self.rainbarrel.rain}')
+            logdbg(f'prev. before reset:   {self.rainbarrel.rain_previous_period}')
+            self.rainbarrel.previous_date_stamp = self.davis_date_stamp
             self.rainbarrel.set_rain_previous_period(0)
+
+            logdbg(f'prev after reset:     {self.rainbarrel.rain_previous_period}')
             logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp.day)}')
 
         if self.rainbarrel.rain < self.rainbarrel.rain_previous_period:
             logdbg('({weeutil.weeutil.timestamp_to_string(time.time())}) Negative Rain')
+
         rain_now = self.rainbarrel.rain - self.rainbarrel.rain_previous_period
         if rain_now > 0:
             logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) rainbarrel.rain: {self.rainbarrel.rain} - rain_previous_period: {self.rainbarrel.rain_previous_period}.')
