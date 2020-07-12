@@ -41,7 +41,7 @@ import datetime
 import weeutil.weeutil
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.7'
+DRIVER_VERSION = '0.2.8b'
 
 MM2INCH = 1 / 25.4
 
@@ -133,10 +133,12 @@ class RainBarrel:
         self.rain = 0
 
     def set_rain_previous_date(self, data):
-        # Send to DEBUG
+        # Setting the current date to Midnight for rain reset
+        data += datetime.timedelta(days=1)
+        data = data.replace(hour=0, minute=0, second=0, microsecond=0)
         self.previous_date_stamp = data
         logdbg(
-            f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain daily reset midnight: {str(self.previous_date_stamp.day)}')
+            f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain daily reset: {str(self.previous_date_stamp)}')
 
 
 class WWLstation():
@@ -315,8 +317,7 @@ class WWLstation():
         return (packet)
 
     def calculate_rain(self):
-
-        if self.davis_date_stamp.day != self.rainbarrel.previous_date_stamp.day:
+        if self.davis_date_stamp.timestamp() > self.rainbarrel.previous_date_stamp.timestamp():
             logdbg(self.current_davis_data)
             # Reset Previous rain at Midnight
             logdbg(f'Previous: {self.rainbarrel.previous_date_stamp}')
@@ -324,7 +325,7 @@ class WWLstation():
             logdbg(f'System:   {self.system_date_stamp}')
             logdbg(f'daily rain Davis:     {self.rainbarrel.rain}')
             logdbg(f'prev. before reset:   {self.rainbarrel.rain_previous_period}')
-            self.rainbarrel.previous_date_stamp = self.davis_date_stamp
+            self.rainbarrel.set_rain_previous_period(self.davis_date_stamp)
             self.rainbarrel.set_rain_previous_period(0)
 
             logdbg(f'prev after reset:     {self.rainbarrel.rain_previous_period}')
