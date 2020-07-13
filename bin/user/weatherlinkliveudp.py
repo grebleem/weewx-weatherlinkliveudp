@@ -325,11 +325,11 @@ class WWLstation():
             logdbg(f'System:   {self.system_date_stamp}')
             logdbg(f'daily rain Davis:     {self.rainbarrel.rain}')
             logdbg(f'prev. before reset:   {self.rainbarrel.rain_previous_period}')
-            self.rainbarrel.set_rain_previous_period(self.davis_date_stamp)
+            self.rainbarrel.set_rain_previous_date(self.davis_date_stamp)
             self.rainbarrel.set_rain_previous_period(0)
 
             logdbg(f'prev after reset:     {self.rainbarrel.rain_previous_period}')
-            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp.day)}')
+            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp)}')
 
         if self.rainbarrel.rain < self.rainbarrel.rain_previous_period:
             logdbg('({weeutil.weeutil.timestamp_to_string(time.time())}) Negative Rain')
