@@ -147,7 +147,7 @@ class RainBarrel:
 
 class WWLstation():
     def __init__(self):
-        self.poll_interval = 10
+        self.poll_interval = 12
         self.txid_iss = None
         self.extra1 = None
 
@@ -167,6 +167,8 @@ class WWLstation():
         self.poll_interval = data
         if self.poll_interval < 10:
             logerr('Unable to set Poll Interval (minimal 10 s.)')
+        elif self.poll_interval < 12:
+            logerr('Warning: poll interval less than 12 seconds will rate-limit the API, if you are using it')
         loginf('HTTP polling interval is %s' % self.poll_interval)
 
     def set_txid(self, data):
@@ -392,7 +394,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.station = WWLstation()
 
-        self.station.set_poll_interval(float(stn_dict.get('poll_interval', 10)))
+        self.station.set_poll_interval(float(stn_dict.get('poll_interval', 12)))
 
         self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
 
