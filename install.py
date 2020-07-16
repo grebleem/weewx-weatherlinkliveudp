@@ -18,7 +18,10 @@ class weatherlinkliveudpInstaller(ExtensionInstaller):
                 'weatherlinkliveudp': {
                     'wll_ip': '1.2.3.4',
                     'poll_interval': 30,
-                    'driver': 'user.weatherlinkliveudp'
+                    'driver': 'user.weatherlinkliveudp',
+                    'api-key': '',
+                    'api-secret': '',
+                    'station-id': ''
                 }
             },
             files=[('bin/user', ['bin/user/weatherlinkliveudp.py'])]
