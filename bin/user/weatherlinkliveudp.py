@@ -147,7 +147,7 @@ class RainBarrel:
 
 class WWLstation():
     def __init__(self):
-        self.poll_interval = 10
+        self.poll_interval = 12
         self.txid_iss = None
         self.extra1 = None
 
@@ -167,6 +167,8 @@ class WWLstation():
         self.poll_interval = data
         if self.poll_interval < 10:
             logerr('Unable to set Poll Interval (minimal 10 s.)')
+        elif self.poll_interval < 12:
+            logerr('Warning: poll interval less than 12 seconds will rate-limit the API, if you are using it')
         loginf('HTTP polling interval is %s' % self.poll_interval)
 
     def set_txid(self, data):
@@ -326,15 +328,18 @@ class WWLstation():
         packet['usUnits'] = weewx.US
         try:
             api_data = api_data["sensors"]
-            if api_data[0]['data'] and (api_data[0]['data_structure_type'] == 11 or api_data[i]['data_structure_type'] == 13):
-                values = api_data[0]['data'][0]
-                # Since we are pulling records from the recent past, weewx might already have a database entry for this exact time. Adding 1 second to make sure the timestamp is unique 
-                packet['dateTime'] = values['ts'] + 1 
-                packet['rxCheckPercent'] = values['reception']
-            else:
-                logerr("No appropriate data structure types found. Data: %s Structure type: %s" % (api_data[0]['data'], api_data[0]['data_structure_type']))
+            for i in range(7):
+                if api_data[i]['data'] and (api_data[i]['data_structure_type'] == 11 or api_data[i]['data_structure_type'] == 13):
+                    loginf("Found data from data ID %s" % i)
+                    values = api_data[i]['data'][0]
+                    # Since we are pulling records from the recent past, weewx might already have a database entry for this exact time. Adding 1 second to make sure the timestamp is unique 
+                    packet['dateTime'] = values['ts'] + 1 
+                    packet['rxCheckPercent'] = values['reception']
+                    break
         except KeyError:
             logerr("No valid API data recieved. Double-check API key/secret and station id.")
+        except IndexError:
+            logerr("No valid data structure types found in API data.")
         finally:
             return (packet)
 
@@ -389,7 +394,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.station = WWLstation()
 
-        self.station.set_poll_interval(float(stn_dict.get('poll_interval', 10)))
+        self.station.set_poll_interval(float(stn_dict.get('poll_interval', 12)))
 
         self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
 
