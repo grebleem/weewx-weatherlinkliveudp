@@ -40,10 +40,6 @@ import weewx.drivers
 import datetime
 import weeutil.weeutil
 
-import collections
-import hashlib
-import hmac
-
 DRIVER_NAME = 'WeatherLinkLiveUDP'
 DRIVER_VERSION = '0.2.8b'
 
@@ -147,14 +143,14 @@ class RainBarrel:
 
 class WWLstation():
     def __init__(self):
-        self.poll_interval = 12
+        self.poll_interval = 10
         self.txid_iss = None
         self.extra1 = None
 
         self.davis_date_stamp = None
         self.system_date_stamp = None
 
-        self.real_time_url = None
+        self.real_rime_url = None
         self.current_conditions_url = None
 
         self.davis_packet = dict()
@@ -167,8 +163,6 @@ class WWLstation():
         self.poll_interval = data
         if self.poll_interval < 10:
             logerr('Unable to set Poll Interval (minimal 10 s.)')
-        elif self.poll_interval < 12:
-            logerr('Warning: poll interval less than 12 seconds will rate-limit the API, if you are using it')
         loginf('HTTP polling interval is %s' % self.poll_interval)
 
     def set_txid(self, data):
@@ -321,27 +315,6 @@ class WWLstation():
                 packet['extraHumid1'] = extra_data1['hum']
 
         return (packet)
-    
-    def decode_data_api(self, api_data):
-        packet = dict()
-        packet['dateTime'] = time.time()
-        packet['usUnits'] = weewx.US
-        try:
-            api_data = api_data["sensors"]
-            for i in range(7):
-                if api_data[i]['data'] and (api_data[i]['data_structure_type'] == 11 or api_data[i]['data_structure_type'] == 13):
-                    loginf("Found data from data ID %s" % i)
-                    values = api_data[i]['data'][0]
-                    # Since we are pulling records from the recent past, weewx might already have a database entry for this exact time. Adding 1 second to make sure the timestamp is unique 
-                    packet['dateTime'] = values['ts'] + 1 
-                    packet['rxCheckPercent'] = values['reception']
-                    break
-        except KeyError:
-            logerr("No valid API data recieved. Double-check API key/secret and station id.")
-        except IndexError:
-            logerr("No valid data structure types found in API data.")
-        finally:
-            return (packet)
 
     def calculate_rain(self):
         if self.davis_date_stamp.timestamp() > self.rainbarrel.previous_date_stamp.timestamp():
@@ -373,9 +346,9 @@ class WWLstation():
 
         self.davis_packet['rain'] = rain_now * self.rainbarrel.bucketsize
 
-    def check_udp_broadcast(self):
+    def check_udp_broascast(self):
         if (self.udp_countdown - 360) < time.time():
-            response = make_request_using_socket(self.real_time_url)
+            response = make_request_using_socket(self.real_rime_url)
             if response is None:
                 logerr('Unable to connect to Weather Link Live')
             elif response.get('data'):
@@ -394,7 +367,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.station = WWLstation()
 
-        self.station.set_poll_interval(float(stn_dict.get('poll_interval', 12)))
+        self.station.set_poll_interval(float(stn_dict.get('poll_interval', 10)))
 
         self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
 
@@ -403,14 +376,8 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.station.set_extra1(stn_dict.get('extra_id'))
 
-        self.api_key = stn_dict.get('api-key')
-        self.api_secret = stn_dict.get('api-secret')
-        self.station_id = stn_dict.get('station-id')
-        if not self.api_key or not self.api_secret or not self.station_id:
-            loginf("Missing WeatherLink API parameter. No WeatherLink API values will be retrieved.")
-
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
-        self.station.real_time_url = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
+        self.station.real_rime_url = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
         self.station.current_conditions_url = f'http://{self.wll_ip}:80/v1/current_conditions'
 
         # Make First Contact with WLL
@@ -450,45 +417,8 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 packet = self.station.decode_data_wll(current_conditions['data'])
                 yield packet
 
-            # Poll WeatherLink API for additional data
-            # WL API expects all of the components of the API call to be in alphabetical order before the signature is calculated
-            if self.api_key and self.api_secret and self.station_id:
-                parameters = {
-                    "api-key": self.api_key,
-                    "station-id": self.station_id,
-                    "t": int(time.time()),
-                    "start-timestamp": int(time.time()-360), 
-                    "end-timestamp": int(time.time())
-                }
-                parameters = collections.OrderedDict(sorted(parameters.items()))
-
-                # Now concatenate all parameters into a string
-                urltext = ""
-                for key in parameters:
-                    urltext = urltext + key + str(parameters[key])
-
-                # Now calculate the API signature using the API secret
-                apiSignature = hmac.new(
-                  self.api_secret.encode('utf-8'),
-                  urltext.encode('utf-8'),
-                  hashlib.sha256
-                ).hexdigest()
-
-                # Finally assemble the URL
-                apiurl = "https://api.weatherlink.com/v2/historic/{}?api-key={}&start-timestamp={}&end-timestamp={}&api-signature={}&t={}".format(parameters["station-id"], parameters["api-key"], parameters["start-timestamp"], parameters["end-timestamp"], apiSignature, parameters["t"])
-
-                api_data = make_request_using_api(apiurl)
-                if api_data is None:
-                    logdbg("No data were returned from the API call")
-                else:
-                    packet =self.station.decode_data_api(api_data)
-                    loginf("Supplemental API data added: %s" % packet)
-                    yield packet
-            else:
-                loginf("Required WeatherLink API parameters missing. Skipping API call")
-
             # Check if UDP is still on
-            self.station.check_udp_broadcast()
+            self.station.check_udp_broascast()
 
             # Set timer to listen to UDP
             self.timeout = time.time() + self.station.poll_interval
@@ -508,7 +438,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     logerr('UDP Socket Time Out')
                     # Reset Countdown to Switch UDP back on.
                     self.station.udp_countdown = 0
-                    self.station.check_udp_broadcast()
+                    self.station.check_udp_broascast()
 
 
 def make_request_using_socket(url):
@@ -531,16 +461,6 @@ def make_request_using_socket(url):
     except requests.RequestException as err:
         # Max retries exceeded
         logerr(f'RequestExeption: {err}')
-
-def make_request_using_api(apiurl):
-    try:
-        response = requests.get(apiurl)
-        responseJSON = response.json()
-        return (responseJSON)
-    except requests.Timeout as e:
-        logerr("Message: %s" % e)
-    except requests.RequestException as e:
-        logerr("RequestException: %s" % e) 
 
 
 # To test this driver, run it directly as follows:
