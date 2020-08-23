@@ -15,6 +15,7 @@
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 #
 
+
 """
 
 Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for getting current weather data and can support continuous requests as often as every 10 seconds. Also it collects a real-time 2.5 sec broadcast for wind speed and rain over UDP port 22222.
@@ -22,7 +23,6 @@ Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for 
 See Davis weatherlink-live-local-api
 
 """
-
 
 from __future__ import with_statement
 
@@ -41,7 +41,7 @@ import datetime
 import weeutil.weeutil
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.7'
+DRIVER_VERSION = '0.2.8'
 
 MM2INCH = 1 / 25.4
 
@@ -133,10 +133,12 @@ class RainBarrel:
         self.rain = 0
 
     def set_rain_previous_date(self, data):
-        # Send to DEBUG
+        # Setting the current date to Midnight for rain reset
+        data += datetime.timedelta(days=1)
+        data = data.replace(hour=0, minute=0, second=0, microsecond=0)
         self.previous_date_stamp = data
         logdbg(
-            f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain daily reset midnight: {str(self.previous_date_stamp.day)}')
+            f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain daily reset: {str(self.previous_date_stamp)}')
 
 
 class WWLstation():
@@ -146,6 +148,7 @@ class WWLstation():
         self.extra1 = None
 
         self.davis_date_stamp = None
+        self.system_date_stamp = None
 
         self.real_rime_url = None
         self.current_conditions_url = None
@@ -181,8 +184,11 @@ class WWLstation():
         iss_udp_data = None
         extra_data1 = None
 
+        self.current_davis_data = data
+
         timestamp = data['ts']
         self.davis_date_stamp = datetime.datetime.fromtimestamp(timestamp)
+        self.system_date_stamp = datetime.datetime.now()
 
         packet = dict()
 
@@ -206,7 +212,8 @@ class WWLstation():
             if condition.get('data_structure_type') == 4:
                 lss_temp_hum_data = condition
 
-            if condition.get('txid') == self.txid_iss and condition.get('data_structure_type') == 1 and not condition.get('temp'):
+            if condition.get('txid') == self.txid_iss and condition.get(
+                    'data_structure_type') == 1 and not condition.get('temp'):
                 iss_udp_data = condition
 
             # If extra sensor are requested, try to find them
@@ -222,10 +229,10 @@ class WWLstation():
             packet['windDir'] = iss_udp_data['wind_dir_last']
 
             # maximum wind speed over last 10 min **(mph)**
-            packet['windGust'] = iss_udp_data['wind_speed_hi_last_10_min']
+            # packet['windGust'] = iss_udp_data['wind_speed_hi_last_10_min']
 
             # gust wind direction over last 10 min **(°degree)**
-            packet['windGustDir'] = iss_udp_data["wind_dir_at_hi_speed_last_10_min"]
+            # packet['windGustDir'] = iss_udp_data["wind_dir_at_hi_speed_last_10_min"]
 
             # Rain
             self.rainbarrel.rain = iss_udp_data['rainfall_daily']
@@ -234,8 +241,10 @@ class WWLstation():
             self.calculate_rain()
 
             packet['rain'] = self.davis_packet['rain']
+
             if packet['rain'] > 0:
-                logdbg(f"UDP rain detect: {self.davis_packet['rain'] / self.rainbarrel.bucketsize} buckets -> {self.davis_packet['rain']} in")
+                logdbg(
+                    f"UDP rain detect: {self.davis_packet['rain'] / self.rainbarrel.bucketsize} buckets -> {self.davis_packet['rain']} in")
 
         # Get HTTP data
         if iss_data and iss_data.get('temp'):
@@ -245,11 +254,11 @@ class WWLstation():
             # most recent valid wind direction **(°degree)**
             packet['windDir'] = iss_data['wind_dir_last']
 
-            # maximum wind speed over last 10 min **(mph)**
-            packet['windGust'] = iss_data['wind_speed_hi_last_10_min']
+            # maximum wind speed over last 2 min **(mph)**
+            packet['windGust'] = iss_data['wind_speed_hi_last_2_min']
 
-            # gust wind direction over last 10 min **(°degree)**
-            packet['windGustDir'] = iss_data["wind_dir_at_hi_speed_last_10_min"]
+            # gust wind direction over last 2 min **(°degree)**
+            packet['windGustDir'] = iss_data["wind_dir_at_hi_speed_last_2_min"]
 
             # most recent valid temperature **(°F)**
             packet['outTemp'] = iss_data['temp']
@@ -285,7 +294,8 @@ class WWLstation():
 
             packet['rain'] = self.davis_packet['rain']
             if packet['rain'] > 0:
-                logdbg(f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
+                logdbg(
+                    f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
 
         if lss_bar_data:
             # most recent bar sensor reading with elevation adjustment **(inches)**
@@ -309,24 +319,37 @@ class WWLstation():
         return (packet)
 
     def calculate_rain(self):
+        if self.davis_date_stamp.timestamp() > self.rainbarrel.previous_date_stamp.timestamp():
+            logdbg(self.current_davis_data)
 
-        if self.davis_date_stamp.day != self.rainbarrel.previous_date_stamp.day:
-            self.rainbarrel.previous_date_stamp = self.davis_date_stamp
             # Reset Previous rain at Midnight
+            logdbg(f'Previous: {self.rainbarrel.previous_date_stamp}')
+            logdbg(f'Davis:   {self.davis_date_stamp}')
+            logdbg(f'System:   {self.system_date_stamp}')
+            logdbg(f'daily rain Davis:     {self.rainbarrel.rain}')
+            logdbg(f'prev. before reset:   {self.rainbarrel.rain_previous_period}')
+            self.rainbarrel.set_rain_previous_date(self.davis_date_stamp)
             self.rainbarrel.set_rain_previous_period(0)
-            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp.day)}')
+
+            logdbg(f'prev after reset:     {self.rainbarrel.rain_previous_period}')
+            logdbg(
+                f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp)}')
 
         if self.rainbarrel.rain < self.rainbarrel.rain_previous_period:
             logdbg('({weeutil.weeutil.timestamp_to_string(time.time())}) Negative Rain')
+
         rain_now = self.rainbarrel.rain - self.rainbarrel.rain_previous_period
         if rain_now > 0:
-            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) rainbarrel.rain: {self.rainbarrel.rain} - rain_previous_period: {self.rainbarrel.rain_previous_period}.')
+            logdbg(
+                f'({weeutil.weeutil.timestamp_to_string(time.time())}) rainbarrel.rain: {self.rainbarrel.rain} - rain_previous_period: {self.rainbarrel.rain_previous_period}.')
             self.rainbarrel.rain_previous_period = self.rainbarrel.rain
             # Empty Barrel
             self.rainbarrel.empty_rain_barrel()
 
-            logdbg(f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain this period: +{rain_now} buckets.[{round(rain_now * self.rainbarrel.bucketsize * 25.4, 1)} mm / {round(rain_now * self.rainbarrel.bucketsize, 2)} in]')
-            logdbg(f'Set Previous period rain to: {self.rainbarrel.rain_previous_period} buckets.[{round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize * 25.4, 1)} mm / {round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize, 2)} in]')
+            logdbg(
+                f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain this period: +{rain_now} buckets.[{round(rain_now * self.rainbarrel.bucketsize * 25.4, 1)} mm / {round(rain_now * self.rainbarrel.bucketsize, 2)} in]')
+            logdbg(
+                f'Set Previous period rain to: {self.rainbarrel.rain_previous_period} buckets.[{round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize * 25.4, 1)} mm / {round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize, 2)} in]')
 
         self.davis_packet['rain'] = rain_now * self.rainbarrel.bucketsize
 
@@ -389,17 +412,33 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
     def hardware_name(self):
         return "WeatherLinkLiveUDP"
 
+    def test_midnight(self):
+        now = datetime.datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        start = '00:00:00'
+        end = '00:00:05'
+        if start < current_time < end:
+            logdbg('Midnight nap')
+            logdbg(current_time)
+            return True
+        else:
+            return False
+
     def genLoopPackets(self):
 
         # Start Loop
         while True:
-            # Get Current Conditions
-            current_conditions = make_request_using_socket(self.station.current_conditions_url)
-            if current_conditions is None:
-                logerr('No current conditions from wll. Check ip address.')
-            elif current_conditions.get('data'):
-                packet = self.station.decode_data_wll(current_conditions['data'])
-                yield packet
+            # Sleep for 5 seconds at midnight
+            if self.test_midnight():
+                logdbg("Midnight, no HTTP packet.")
+            else:
+                # Get Current Conditions
+                current_conditions = make_request_using_socket(self.station.current_conditions_url)
+                if current_conditions is None:
+                    logerr('No current conditions from wll. Check ip address.')
+                elif current_conditions.get('data'):
+                    packet = self.station.decode_data_wll(current_conditions['data'])
+                    yield packet
 
             # Check if UDP is still on
             self.station.check_udp_broascast()
@@ -415,9 +454,12 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     if UDP_data["conditions"] is None:
                         logdbg(UDP_data["error"])
                     else:
-                        packet =self.station.decode_data_wll(UDP_data)
-                        # Yield UDP
-                        yield packet
+                        if self.test_midnight():
+                            logdbg("Midnight, no UDP packet.")
+                        else:
+                            packet = self.station.decode_data_wll(UDP_data)
+                            # Yield UDP
+                            yield packet
                 except socket.timeout:
                     logerr('UDP Socket Time Out')
                     # Reset Countdown to Switch UDP back on.
