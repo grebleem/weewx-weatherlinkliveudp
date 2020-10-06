@@ -445,12 +445,15 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 logdbg("Midnight, no HTTP packet.")
             else:
                 # Get Current Conditions
-                current_conditions = make_request_using_socket(self.station.current_conditions_url)
-                if current_conditions is None:
-                    logerr('No current conditions from wll. Check ip address.')
-                elif current_conditions.get('data'):
-                    packet = self.station.decode_data_wll(current_conditions['data'])
-                    yield packet
+                try:
+                    current_conditions = make_request_using_socket(self.station.current_conditions_url)
+                    if current_conditions is None:
+                        logerr('No current conditions from wll. Check ip address.')
+                    elif current_conditions.get('data'):
+                        packet = self.station.decode_data_wll(current_conditions['data'])
+                        yield packet
+                except:  # catch *all* exceptions
+                    logerr('Other error in http loop')
 
             # Check if UDP is still on
             self.station.check_udp_broascast()
@@ -472,11 +475,20 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                             packet = self.station.decode_data_wll(UDP_data)
                             # Yield UDP
                             yield packet
+                # Catch json decoder faults
+                except json.JSONDecodeError:
+                    logging.info(
+                        "Message was ignored because it was not valid JSON.",
+                    )
+
                 except socket.timeout:
                     logerr('UDP Socket Time Out')
                     # Reset Countdown to Switch UDP back on.
                     self.station.udp_countdown = 0
                     self.station.check_udp_broascast()
+
+                except:  # catch *all* exceptions
+                    logerr('Other UDP error')
 
 
 def make_request_using_socket(url):
