@@ -15,7 +15,6 @@
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 #
 # Bug Fixes September 2020
-# Empty UDP Craches Driver
 
 """
 
@@ -233,17 +232,11 @@ class WWLstation():
             # most recent valid wind direction **(°degree)**
             packet['windDir'] = iss_udp_data['wind_dir_last']
 
-            # maximum wind speed over last 10 min **(mph)**
-            # packet['windGust'] = iss_udp_data['wind_speed_hi_last_10_min']
 
-            # gust wind direction over last 10 min **(°degree)**
-            # packet['windGustDir'] = iss_udp_data["wind_dir_at_hi_speed_last_10_min"]
 
             # Rain
             ## Fix: Check for NoneType
             self.rainbarrel.rain = iss_udp_data['rainfall_daily']
-
-            iss_udp_data['rain_rate_last'] = None
 
             if iss_udp_data['rain_rate_last'] is None:
                 logdbg("Error: UDP->rain_rate_last not defined")
