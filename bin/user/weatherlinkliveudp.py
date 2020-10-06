@@ -222,9 +222,6 @@ class WWLstation():
 
         # Get UDP data
         if iss_udp_data:
-            # Show packet for Debug
-
-            logdbg(iss_udp_data)
 
             # most recent valid wind speed **(mph)**
             packet['windSpeed'] = iss_udp_data['wind_speed_last']
