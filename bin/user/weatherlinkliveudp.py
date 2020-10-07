@@ -495,6 +495,9 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     self.station.udp_countdown = 0
                     self.station.check_udp_broascast()
 
+                except GeneratorExit:
+                    logdbg('UDP Loop Exit')
+
                 except:  # catch *all* exceptions
                     logerr('Other UDP error {}'.format(sys.exc_info()[0]))
 
