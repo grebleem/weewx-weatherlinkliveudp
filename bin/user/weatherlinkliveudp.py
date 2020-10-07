@@ -18,7 +18,9 @@
 
 """
 
-Weewx Driver for The WeatherLink Live (WLL). It implements a HTTP interface for getting current weather data and can support continuous requests as often as every 10 seconds. Also it collects a real-time 2.5 sec broadcast for wind speed and rain over UDP port 22222.
+Weewx Driver for The WeatherLink Live (WLL).
+It implements a HTTP interface for getting current weather data and can support continuous requests as often as every 10 seconds.
+Also it collects a real-time 2.5 sec broadcast for wind speed and rain over UDP port 22222.
 
 See Davis weatherlink-live-local-api
 
@@ -39,9 +41,10 @@ from requests.packages.urllib3.util.retry import Retry
 import weewx.drivers
 import datetime
 import weeutil.weeutil
+import sys
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.8'
+DRIVER_VERSION = '0.2.9'
 
 MM2INCH = 1 / 25.4
 
@@ -94,6 +97,9 @@ def loader(config_dict, engine):
     return WeatherLinkLiveUDPDriver(**config_dict[DRIVER_NAME])
 
 
+def total_seconds(dt):
+    return (dt - datetime.datetime(1970, 1, 1)).total_seconds()
+
 class RainBarrel:
     def __init__(self):
         self.bucketsize = 0.0
@@ -110,24 +116,27 @@ class RainBarrel:
 
             if type == 1:
                 self.bucketsize = 0.01
-                logdbg(f'Bucketsize is set at 0.01 in')
+                logdbg('Bucketsize is set at 0.01 in')
 
             elif type == 2:
                 self.bucketsize = 0.2 * MM2INCH
-                logdbg(f'Bucketsize is set at 0.2 mm')
+                logdbg('Bucketsize is set at 0.2 mm')
 
             elif type == 3:
                 self.bucketsize = 0.1 * MM2INCH
-                logdbg(f'Bucketsize is set at 0.1 mm')
+                logdbg('Bucketsize is set at 0.1 mm')
 
             elif type == 4:
                 self.bucketsize = 0.001
-                logdbg(f'Bucketsize is set at 0.001 in')
+                logdbg('Bucketsize is set at 0.001 in')
 
     def set_rain_previous_period(self, data):
         self.rain_previous_period = data
-        logdbg(
-            f'({weeutil.weeutil.timestamp_to_string(time.time())}) Previous rain is set at: {(self.rain_previous_period)} buckets [{round(self.rain_previous_period * self.bucketsize * 25.4, 1)} mm / {round(self.rain_previous_period * self.bucketsize, 2)} in]')
+        logdbg('({}) Previous rain is set at: {} buckets [{} mm / {} in]'
+               .format(weeutil.weeutil.timestamp_to_string(time.time()),
+                       (self.rain_previous_period),
+                       round(self.rain_previous_period * self.bucketsize * 25.4, 1),
+                       round(self.rain_previous_period * self.bucketsize, 2)))
 
     def empty_rain_barrel(self):
         self.rain = 0
@@ -137,11 +146,12 @@ class RainBarrel:
         data += datetime.timedelta(days=1)
         data = data.replace(hour=0, minute=0, second=0, microsecond=0)
         self.previous_date_stamp = data
-        logdbg(
-            f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain daily reset: {str(self.previous_date_stamp)}')
+        logdbg('({}) Rain daily reset: {}'
+               .format(weeutil.weeutil.timestamp_to_string(time.time()),
+                       str(self.previous_date_stamp)))
 
 
-class WWLstation():
+class WllStation:
     def __init__(self):
         self.poll_interval = 10
         self.txid_iss = None
@@ -168,12 +178,12 @@ class WWLstation():
     def set_txid(self, data):
         if data:
             self.txid_iss = int(data)
-            loginf(f'tx id of ISS is {self.txid_iss}')
+            loginf('tx id of ISS is {}'.format(self.txid_iss))
 
     def set_extra1(self, data):
         if data:
             self.extra1 = int(data)
-            loginf(f'Extra sensor is using id: {self.extra1}')
+            loginf('Extra sensor is using id: {}'.format(self.extra1))
 
     def decode_data_wll(self, data):
 
@@ -226,13 +236,10 @@ class WWLstation():
             # most recent valid wind speed **(mph)**
             packet['windSpeed'] = iss_udp_data['wind_speed_last']
 
-            # most recent valid wind direction **(°degree)**
+            # most recent valid wind direction **(degree)**
             packet['windDir'] = iss_udp_data['wind_dir_last']
 
-
-
             # Rain
-            ## Fix: Check for NoneType
             self.rainbarrel.rain = iss_udp_data['rainfall_daily']
 
             if iss_udp_data['rain_rate_last'] is None:
@@ -245,39 +252,40 @@ class WWLstation():
             packet['rain'] = self.davis_packet['rain']
 
             if packet['rain'] > 0:
-                logdbg(
-                    f"UDP rain detect: {self.davis_packet['rain'] / self.rainbarrel.bucketsize} buckets -> {self.davis_packet['rain']} in")
+                logdbg('UDP rain detect: {} buckets -> {} in'
+                       .format(self.davis_packet['rain'] / self.rainbarrel.bucketsize,
+                               self.davis_packet['rain']))
 
         # Get HTTP data
         if iss_data and iss_data.get('temp'):
             # most recent valid wind speed **(mph)**
             packet['windSpeed'] = iss_data['wind_speed_last']
 
-            # most recent valid wind direction **(°degree)**
+            # most recent valid wind direction **(degree)**
             packet['windDir'] = iss_data['wind_dir_last']
 
             # maximum wind speed over last 2 min **(mph)**
             packet['windGust'] = iss_data['wind_speed_hi_last_2_min']
 
-            # gust wind direction over last 2 min **(°degree)**
+            # gust wind direction over last 2 min **(degree)**
             packet['windGustDir'] = iss_data["wind_dir_at_hi_speed_last_2_min"]
 
-            # most recent valid temperature **(°F)**
+            # most recent valid temperature **(F)**
             packet['outTemp'] = iss_data['temp']
 
             # most recent valid humidity **(%RH)**
             packet['outHumidity'] = iss_data['hum']
 
-            # **(°F)**
+            # **(F)**
             packet['dewpoint'] = iss_data['dew_point']
 
-            # **(°F)**
+            # **(F)**
             packet['heatindex'] = iss_data['heat_index']
 
-            # **(°F)**
+            # **(F)**
             packet['windchill'] = iss_data['wind_chill']
 
-            # most recent solar radiation **(W/m²)**
+            # most recent solar radiation **(W/m)**
             packet['radiation'] = iss_data['solar_rad']
 
             # most recent UV index **(Index)**
@@ -296,8 +304,9 @@ class WWLstation():
 
             packet['rain'] = self.davis_packet['rain']
             if packet['rain'] > 0:
-                logdbg(
-                    f"HTTP rain detect: {packet['rain'] / self.rainbarrel.bucketsize} buckets -> {packet['rain']} in")
+                logdbg('HTTP rain detect: {} buckets -> {} in'
+                       .format(packet['rain'] / self.rainbarrel.bucketsize,
+                               packet['rain']))
 
         if lss_bar_data:
             # most recent bar sensor reading with elevation adjustment **(inches)**
@@ -305,11 +314,11 @@ class WWLstation():
             packet['pressure'] = lss_bar_data['bar_absolute']
 
         if lss_temp_hum_data:
-            # most recent valid inside temp **(°F)**
+            # most recent valid inside temp **(F)**
             packet['inTemp'] = lss_temp_hum_data['temp_in']
             # most recent valid inside humidity **(%RH)**
             packet['inHumidity'] = lss_temp_hum_data['hum_in']
-            # **(°F)**
+            # **(F)**
             packet['inDewpoint'] = lss_temp_hum_data['dew_point_in']
 
         if extra_data1:
@@ -318,40 +327,49 @@ class WWLstation():
             if extra_data1.get('hum'):
                 packet['extraHumid1'] = extra_data1['hum']
 
-        return (packet)
+        return packet
 
     def calculate_rain(self):
-        if self.davis_date_stamp.timestamp() > self.rainbarrel.previous_date_stamp.timestamp():
+        if total_seconds(self.davis_date_stamp) > total_seconds(self.rainbarrel.previous_date_stamp):
             logdbg(self.current_davis_data)
 
             # Reset Previous rain at Midnight
-            logdbg(f'Previous: {self.rainbarrel.previous_date_stamp}')
-            logdbg(f'Davis:   {self.davis_date_stamp}')
-            logdbg(f'System:   {self.system_date_stamp}')
-            logdbg(f'daily rain Davis:     {self.rainbarrel.rain}')
-            logdbg(f'prev. before reset:   {self.rainbarrel.rain_previous_period}')
+            logdbg('Previous: {}'.format(self.rainbarrel.previous_date_stamp))
+            logdbg('Davis:   {}'.format(self.davis_date_stamp))
+            logdbg('System:   {}'.format(self.system_date_stamp))
+            logdbg('daily rain Davis:     {}'.format(self.rainbarrel.rain))
+            logdbg('prev. before reset:   {}'.format(self.rainbarrel.rain_previous_period))
+
             self.rainbarrel.set_rain_previous_date(self.davis_date_stamp)
             self.rainbarrel.set_rain_previous_period(0)
 
-            logdbg(f'prev after reset:     {self.rainbarrel.rain_previous_period}')
-            logdbg(
-                f'({weeutil.weeutil.timestamp_to_string(time.time())}) Daily rain reset - next reset midnight {str(self.rainbarrel.previous_date_stamp)}')
+            logdbg('prev after reset:     {}'.format(self.rainbarrel.rain_previous_period))
+            logdbg('({}) Daily rain reset - next reset midnight {}'
+                   .format(weeutil.weeutil.timestamp_to_string(time.time()), str(self.rainbarrel.previous_date_stamp)))
 
         if self.rainbarrel.rain < self.rainbarrel.rain_previous_period:
-            logdbg('({weeutil.weeutil.timestamp_to_string(time.time())}) Negative Rain')
+            logdbg('({}) Negative Rain'.format(weeutil.weeutil.timestamp_to_string(time.time())))
 
         rain_now = self.rainbarrel.rain - self.rainbarrel.rain_previous_period
         if rain_now > 0:
-            logdbg(
-                f'({weeutil.weeutil.timestamp_to_string(time.time())}) rainbarrel.rain: {self.rainbarrel.rain} - rain_previous_period: {self.rainbarrel.rain_previous_period}.')
+            logdbg('({}) rainbarrel.rain: {} - rain_previous_period: {}.'
+                   .format(weeutil.weeutil.timestamp_to_string(time.time()),
+                           self.rainbarrel.rain,
+                           self.rainbarrel.rain_previous_period))
+
             self.rainbarrel.rain_previous_period = self.rainbarrel.rain
             # Empty Barrel
             self.rainbarrel.empty_rain_barrel()
 
-            logdbg(
-                f'({weeutil.weeutil.timestamp_to_string(time.time())}) Rain this period: +{rain_now} buckets.[{round(rain_now * self.rainbarrel.bucketsize * 25.4, 1)} mm / {round(rain_now * self.rainbarrel.bucketsize, 2)} in]')
-            logdbg(
-                f'Set Previous period rain to: {self.rainbarrel.rain_previous_period} buckets.[{round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize * 25.4, 1)} mm / {round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize, 2)} in]')
+            logdbg('({}) Rain this period: +{} buckets.[{} mm / {} in]'
+                   .format(weeutil.weeutil.timestamp_to_string(time.time()),
+                           rain_now,
+                           round(rain_now * self.rainbarrel.bucketsize * 25.4, 1),
+                           round(rain_now * self.rainbarrel.bucketsize, 2)))
+            logdbg('Set Previous period rain to: {} buckets.[{} mm / {} in]'
+                   .format(self.rainbarrel.rain_previous_period,
+                           round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize * 25.4, 1),
+                           round(self.rainbarrel.rain_previous_period * self.rainbarrel.bucketsize, 2)))
 
         self.davis_packet['rain'] = rain_now * self.rainbarrel.bucketsize
 
@@ -363,7 +381,7 @@ class WWLstation():
             elif response.get('data'):
                 Req_data = response
                 self.udp_countdown = time.time() + Req_data['data']['duration']
-                loginf(f'UDP check at: {weeutil.weeutil.timestamp_to_string(self.udp_countdown)}')
+                loginf('UDP check at: {}'.format(weeutil.weeutil.timestamp_to_string(self.udp_countdown)))
 
 
 class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
@@ -374,7 +392,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         # Show Diver version
         loginf('WLL UDP driver version is %s' % DRIVER_VERSION)
 
-        self.station = WWLstation()
+        self.station = WllStation()
 
         self.station.set_poll_interval(float(stn_dict.get('poll_interval', 10)))
 
@@ -386,8 +404,8 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
         self.station.set_extra1(stn_dict.get('extra_id'))
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
-        self.station.real_rime_url = f'http://{self.wll_ip}:80/v1/real_time?duration=3600'
-        self.station.current_conditions_url = f'http://{self.wll_ip}:80/v1/current_conditions'
+        self.station.real_rime_url = 'http://{}:80/v1/real_time?duration=3600'.format(self.wll_ip)
+        self.station.current_conditions_url = 'http://{}:80/v1/current_conditions'.format(self.wll_ip)
 
         # Make First Contact with WLL
         response = make_request_using_socket(self.station.current_conditions_url)
@@ -439,7 +457,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     current_conditions = make_request_using_socket(self.station.current_conditions_url)
                     if current_conditions is None:
                         logerr('No current conditions from wll. Check ip address.')
-                    elif current_conditions.get('data'):
+                    elif current_conditions['data']:
                         packet = self.station.decode_data_wll(current_conditions['data'])
                         yield packet
                 except:  # catch *all* exceptions
@@ -466,10 +484,10 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                             # Yield UDP
                             yield packet
                 # Catch json decoder faults
-                except json.JSONDecodeError:
-                    logging.info(
-                        "Message was ignored because it was not valid JSON.",
-                    )
+                # except json.JSONDecodeError:
+                #     logging.info(
+                #         "Message was ignored because it was not valid JSON.",
+                #     )
 
                 except socket.timeout:
                     logerr('UDP Socket Time Out')
@@ -478,7 +496,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     self.station.check_udp_broascast()
 
                 except:  # catch *all* exceptions
-                    logerr('Other UDP error')
+                    logerr('Other UDP error {}'.format(sys.exc_info()[0]))
 
 
 def make_request_using_socket(url):
@@ -495,12 +513,12 @@ def make_request_using_socket(url):
         if json_data["data"] is None:
             logerr(json_data["error"])
         else:
-            return (json_data)
+            return json_data
     except requests.Timeout as err:
         logerr({"message": err})
     except requests.RequestException as err:
         # Max retries exceeded
-        logerr(f'RequestExeption: {err}')
+        logerr('Request Exception: {}'.format(err))
 
 
 # To test this driver, run it directly as follows:
