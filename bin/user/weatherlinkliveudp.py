@@ -96,10 +96,6 @@ except ImportError:
 def loader(config_dict, engine):
     return WeatherLinkLiveUDPDriver(**config_dict[DRIVER_NAME])
 
-
-def total_seconds(dt):
-    return (dt - datetime.datetime(1970, 1, 1)).total_seconds()
-
 class RainBarrel:
     def __init__(self):
         self.bucketsize = 0.0
@@ -240,6 +236,7 @@ class WllStation:
             packet['windDir'] = iss_udp_data['wind_dir_last']
 
             # Rain
+            ## Fix: Check for NoneType
             self.rainbarrel.rain = iss_udp_data['rainfall_daily']
 
             if iss_udp_data['rain_rate_last'] is None:
@@ -330,8 +327,7 @@ class WllStation:
         return packet
 
     def calculate_rain(self):
-        if total_seconds(self.davis_date_stamp) > total_seconds(self.rainbarrel.previous_date_stamp):
-            logdbg(self.current_davis_data)
+        if self.davis_date_stamp.timestamp() > self.rainbarrel.previous_date_stamp.timestamp():
 
             # Reset Previous rain at Midnight
             logdbg('Previous: {}'.format(self.rainbarrel.previous_date_stamp))
@@ -381,7 +377,7 @@ class WllStation:
             elif response.get('data'):
                 Req_data = response
                 self.udp_countdown = time.time() + Req_data['data']['duration']
-                loginf('UDP check at: {}'.format(weeutil.weeutil.timestamp_to_string(self.udp_countdown)))
+                logdbg('UDP check at: {}'.format(weeutil.weeutil.timestamp_to_string(self.udp_countdown)))
 
 
 class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
@@ -453,15 +449,13 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                 logdbg("Midnight, no HTTP packet.")
             else:
                 # Get Current Conditions
-                try:
-                    current_conditions = make_request_using_socket(self.station.current_conditions_url)
-                    if current_conditions is None:
-                        logerr('No current conditions from wll. Check ip address.')
-                    elif current_conditions['data']:
-                        packet = self.station.decode_data_wll(current_conditions['data'])
-                        yield packet
-                except:  # catch *all* exceptions
-                    logerr('Other error in http loop')
+                current_conditions = make_request_using_socket(self.station.current_conditions_url)
+                if current_conditions is None:
+                    logerr('No current conditions from wll. Check ip address.')
+                elif current_conditions.get('data'):
+                    packet = self.station.decode_data_wll(current_conditions['data'])
+                    yield packet
+
 
             # Check if UDP is still on
             self.station.check_udp_broascast()
@@ -484,22 +478,16 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                             # Yield UDP
                             yield packet
                 # Catch json decoder faults
-                # except json.JSONDecodeError:
-                #     logging.info(
-                #         "Message was ignored because it was not valid JSON.",
-                #     )
+                except json.JSONDecodeError:
+                    logging.info(
+                        "Message was ignored because it was not valid JSON.",
+                    )
 
                 except socket.timeout:
                     logerr('UDP Socket Time Out')
                     # Reset Countdown to Switch UDP back on.
                     self.station.udp_countdown = 0
                     self.station.check_udp_broascast()
-
-                except GeneratorExit:
-                    logdbg('UDP Loop Exit')
-
-                except:  # catch *all* exceptions
-                    logerr('Other UDP error {}'.format(sys.exc_info()[0]))
 
 
 def make_request_using_socket(url):
