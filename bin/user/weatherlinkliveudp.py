@@ -456,7 +456,6 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     packet = self.station.decode_data_wll(current_conditions['data'])
                     yield packet
 
-
             # Check if UDP is still on
             self.station.check_udp_broascast()
 
