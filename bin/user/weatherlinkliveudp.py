@@ -267,6 +267,11 @@ class WllStation:
             # gust wind direction over last 2 min **(degree)**
             packet['windGustDir'] = iss_data["wind_dir_at_hi_speed_last_2_min"]
 
+            # wind speed and direction average for the last 10 minutes
+            # (not recorded in archive but used elsewhere)
+            packet['windSpeed10'] = iss_data["wind_speed_avg_last_10_min"]
+            packet['windDir10'] = iss_data["wind_dir_scalar_avg_last_10_min"]
+            
             # most recent valid temperature **(F)**
             packet['outTemp'] = iss_data['temp']
 
@@ -281,6 +286,11 @@ class WllStation:
 
             # **(F)**
             packet['windchill'] = iss_data['wind_chill']
+            
+            # **(F)**
+            packet['THSW'] = iss_data['thsw_index']
+            
+            packet['outWetbulb'] = iss_data['wet_bulb']
 
             # most recent solar radiation **(W/m)**
             packet['radiation'] = iss_data['solar_rad']
