@@ -17,6 +17,7 @@ class weatherlinkliveudpInstaller(ExtensionInstaller):
             config={
                 'WeatherLinkLiveUDP': {
                     'wll_ip': '1.2.3.4',
+                    'wwl_air_ip': '1.2.3.5',
                     'poll_interval': 30,
                     'driver': 'user.weatherlinkliveudp'
                 }

@@ -41,10 +41,10 @@ from requests.packages.urllib3.util.retry import Retry
 import weewx.drivers
 import datetime
 import weeutil.weeutil
-import sys
+# import sys
 
 DRIVER_NAME = 'WeatherLinkLiveUDP'
-DRIVER_VERSION = '0.2.9'
+DRIVER_VERSION = '0.3.0'
 
 MM2INCH = 1 / 25.4
 
@@ -95,6 +95,7 @@ except ImportError:
 
 def loader(config_dict, engine):
     return WeatherLinkLiveUDPDriver(**config_dict[DRIVER_NAME])
+
 
 class RainBarrel:
     def __init__(self):
@@ -158,6 +159,7 @@ class WllStation:
 
         self.real_rime_url = None
         self.current_conditions_url = None
+        self.current_air_conditions_url = None
 
         self.davis_packet = dict()
         self.davis_packet['rain'] = 0
@@ -189,8 +191,9 @@ class WllStation:
         lss_temp_hum_data = None
         iss_udp_data = None
         extra_data1 = None
+        # air_data = None
 
-        self.current_davis_data = data
+        # self.current_davis_data = data
 
         timestamp = data['ts']
         self.davis_date_stamp = datetime.datetime.fromtimestamp(timestamp)
@@ -206,9 +209,11 @@ class WllStation:
             # 2 = Leaf/Soil Moisture Current Conditions record
             # 3 = LSS BAR Current Conditions record
             # 4 = LSS Temp/Hum Current Conditions record
+            # 6 = AirLink data
 
             if condition.get('txid') == self.txid_iss and condition.get('data_structure_type') == 1:
                 iss_data = condition
+
             if condition.get('data_structure_type') == 2:
                 leaf_soil_data = condition
 
@@ -217,6 +222,9 @@ class WllStation:
 
             if condition.get('data_structure_type') == 4:
                 lss_temp_hum_data = condition
+
+            if condition.get('data_structure_type') == 6:
+                air_data = condition
 
             if condition.get('txid') == self.txid_iss and condition.get(
                     'data_structure_type') == 1 and not condition.get('temp'):
@@ -334,7 +342,32 @@ class WllStation:
             if extra_data1.get('hum'):
                 packet['extraHumid1'] = extra_data1['hum']
 
+        # if air_data:
+        #     # pm10_0
+        #     # double
+        #     # pm1_0
+        #     # double
+        #     # pm2_5
+        #     packet['pm1_0'] = air_data['pm_1']
+        #     packet['pm2_5'] = air_data['pm_2p5']
+        #     packet['pm10_0'] = air_data['pm_10']
+
         return packet
+
+    def decode_air_data_wll(self, data):
+
+        air_packet = dict()
+
+        for condition in data['conditions']:
+            # 6 = AirLink data
+
+            if condition.get('data_structure_type') == 6:
+
+                air_packet['pm1_0'] = condition['pm_1']
+                air_packet['pm2_5'] = condition['pm_2p5']
+                air_packet['pm10_0'] = condition['pm_10']
+
+        return air_packet
 
     def calculate_rain(self):
         if self.davis_date_stamp.timestamp() > self.rainbarrel.previous_date_stamp.timestamp():
@@ -404,14 +437,24 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
 
+        if stn_dict.get('wll_air_ip') is not None:
+            print(stn_dict.get('wll_air_ip'))
+            self.wll_air_ip = stn_dict.get('wll_air_ip')
+        # self.wll_air_ip = '192.168.1.199'
+
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
 
         self.station.set_extra1(stn_dict.get('extra_id'))
 
         # Tells the WW to begin broadcasting UDP data and continue for 1 hour seconds
-        self.station.real_rime_url = 'http://{}:80/v1/real_time?duration=3600'.format(self.wll_ip)
-        self.station.current_conditions_url = 'http://{}:80/v1/current_conditions'.format(self.wll_ip)
+        self.station.real_rime_url = 'http://{}/v1/real_time?duration=3600'.format(self.wll_ip)
+
+        self.station.current_conditions_url = 'http://{}/v1/current_conditions'.format(self.wll_ip)
+
+        if self.wll_air_ip is not None:
+            self.station.current_air_conditions_url = 'http://{}/v1/current_conditions'.format(self.wll_air_ip)
+            print(self.station.current_air_conditions_url)
 
         # Make First Contact with WLL
         response = make_request_using_socket(self.station.current_conditions_url)
@@ -464,7 +507,18 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     logerr('No current conditions from wll. Check ip address.')
                 elif current_conditions.get('data'):
                     packet = self.station.decode_data_wll(current_conditions['data'])
-                    yield packet
+                    #yield packet
+
+                # Get Air Conditions
+                if self.station.current_air_conditions_url is not None:
+                    current_air_conditions = make_request_using_socket(self.station.current_air_conditions_url)
+                    if current_air_conditions is None:
+                        logerr('No current air conditions from wll. Check ip address.')
+                    elif current_air_conditions.get('data'):
+                        packet.update(self.station.decode_air_data_wll(current_air_conditions['data']))
+
+                yield packet
+
 
             # Check if UDP is still on
             self.station.check_udp_broascast()
