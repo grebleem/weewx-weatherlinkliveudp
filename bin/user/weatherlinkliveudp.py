@@ -14,7 +14,7 @@
 #
 # Based on https://weatherlink.github.io/weatherlink-live-local-api/
 #
-# Bug Fixes September 2020
+# Beta AirLink
 
 """
 
@@ -437,10 +437,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
 
-        if stn_dict.get('wll_air_ip') is not None:
-            print(stn_dict.get('wll_air_ip'))
-            self.wll_air_ip = stn_dict.get('wll_air_ip')
-        # self.wll_air_ip = '192.168.1.199'
+        self.wll_air_ip = stn_dict.get('wll_air_ip', None)
 
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
