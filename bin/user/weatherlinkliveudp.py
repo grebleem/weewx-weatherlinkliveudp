@@ -363,9 +363,9 @@ class WllStation:
 
             if condition.get('data_structure_type') == 6:
 
-                air_packet['pm1_0'] = condition['pm_1']
-                air_packet['pm2_5'] = condition['pm_2p5']
-                air_packet['pm10_0'] = condition['pm_10']
+                air_packet['pm1_0'] = condition['pm_1_last']
+                air_packet['pm2_5'] = condition['pm_2p5_last']
+                air_packet['pm10_0'] = condition['pm_10_last']
 
         return air_packet
 
@@ -437,7 +437,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         self.wll_ip = stn_dict.get('wll_ip', '192.168.1.47')
 
-        self.wll_air_ip = stn_dict.get('wll_air_ip', None)
+        self.wll_air_ip = stn_dict.get('wll_air_ip', '192.168.1.199')
 
         if self.wll_ip is None:
             logerr("No Weatherlink Live IP provided")
@@ -451,7 +451,7 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
         if self.wll_air_ip is not None:
             self.station.current_air_conditions_url = 'http://{}/v1/current_conditions'.format(self.wll_air_ip)
-            print(self.station.current_air_conditions_url)
+            # print(self.station.current_air_conditions_url)
 
         # Make First Contact with WLL
         response = make_request_using_socket(self.station.current_conditions_url)
