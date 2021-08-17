@@ -504,17 +504,17 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
                     logerr('No current conditions from wll. Check ip address.')
                 elif current_conditions.get('data'):
                     packet = self.station.decode_data_wll(current_conditions['data'])
-                    #yield packet
+                    yield packet
 
                 # Get Air Conditions
-                if self.station.current_air_conditions_url is not None:
-                    current_air_conditions = make_request_using_socket(self.station.current_air_conditions_url)
-                    if current_air_conditions is None:
-                        logerr('No current air conditions from wll. Check ip address.')
-                    elif current_air_conditions.get('data'):
-                        packet.update(self.station.decode_air_data_wll(current_air_conditions['data']))
-
-                yield packet
+                # if self.station.current_air_conditions_url is not None:
+                #     current_air_conditions = make_request_using_socket(self.station.current_air_conditions_url)
+                #     if current_air_conditions is None:
+                #         logerr('No current air conditions from wll. Check ip address.')
+                #     elif current_air_conditions.get('data'):
+                #         if packet is not None:
+                #             packet.update(self.station.decode_air_data_wll(current_air_conditions['data']))
+                # yield packet
 
 
             # Check if UDP is still on
