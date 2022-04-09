@@ -139,6 +139,7 @@ class RainBarrel:
 
     def set_rain_previous_date(self, data):
         # Setting the current date to Midnight for rain reset
+        # data is class datetime
         data += datetime.timedelta(days=1)
         data = data.replace(hour=0, minute=0, second=0, microsecond=0)
         self.previous_date_stamp = data
@@ -152,6 +153,7 @@ class WllStation:
         self.poll_interval = 10
         self.txid_iss = None
         self.extra1 = None
+        self.txid_instromet_sun = None
 
         self.davis_date_stamp = None
         self.system_date_stamp = None
@@ -162,6 +164,9 @@ class WllStation:
         self.davis_packet = dict()
         self.davis_packet['rain'] = 0
         self.udp_countdown = 0
+
+        self.instromet_sun_previous_timestamp = None
+        self.instromet_sun_previous_value = None
 
     rainbarrel = RainBarrel()
 
@@ -189,6 +194,7 @@ class WllStation:
         lss_temp_hum_data = None
         iss_udp_data = None
         extra_data1 = None
+        instromet_sun_data = None
 
         self.current_davis_data = data
 
@@ -225,6 +231,12 @@ class WllStation:
             # If extra sensor are requested, try to find them
             if self.extra1 and condition.get('txid') == self.extra1:
                 extra_data1 = condition
+                
+            # Instromet sunshine duration sensor
+            if self.txid_instromet_sun is not None and condition.get(
+                    'txid')==self.txid_instromet_sun and condition.get(
+                    'data_structure_type')==1:
+                instromet_sun_data = condition
 
         # Get UDP data
         if iss_udp_data:
@@ -334,6 +346,23 @@ class WllStation:
             if extra_data1.get('hum'):
                 packet['extraHumid1'] = extra_data1['hum']
 
+        # Instromet sunshine duration sensor
+        # The sensor uses the rain input of an additional transmitter
+        # unit. It sends 1 tick every 36 seconds of sunshine.
+        if instromet_sun_data:
+            sunduration = instromet_sun_data.get('rainfall_daily')
+            if data['ts']>self.instromet_sun_previous_timestamp:
+                if sunduration>=self.instromet_sun_previous_value:
+                    packet['sunshineDur'] = (sunduration-self.instromet_sun_previous_value)*36
+                    packet['sunshine_time'] = packet['sunshineDur']
+                else:
+                    # new day
+                    packet['sunshineDur'] = 0.0
+                    packet['sunshine_time'] = 0.0
+                packet['daySunshineDur'] = sunduration*36
+                self.instromet_sun_previous_value = sunduration
+                self.instromet_sun_previous_timestamp = data['ts']
+            
         return packet
 
     def calculate_rain(self):
@@ -433,6 +462,20 @@ class WeatherLinkLiveUDPDriver(weewx.drivers.AbstractDevice):
 
             # Set date for previous rain
             self.station.rainbarrel.set_rain_previous_date(datetime.datetime.fromtimestamp(data['ts']))
+            
+            # Instromet sunshine duration sensor
+            txid_instromet_sun = stn_dict.get('txid_instromet_sun')
+            try:
+                txid_instromet_sun = int(txid_instromet_sun)
+            except (ValueError,TypeError):
+                txid_instromet_sun = None
+            if txid_instromet_sun is not None:
+                self.station.txid_instromet_sun = txid_instromet_sun
+                for condition in data['conditions']:
+                    if condition.get('txid') == self.station.txid_instromet_sun:
+                        self.station.instromet_sun_previous_value = condition.get('rainfall_daily')
+                        self.station.instromet_sun_previous_timestamp = data['ts']
+                        break
 
     @property
     def hardware_name(self):
