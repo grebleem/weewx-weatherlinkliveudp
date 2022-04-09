@@ -55,3 +55,25 @@ or us pip
 ```
 pip install requests
 ```
+
+### Extra Configuration
+
+```
+# The WLL can get dat from up to eight transmitters. If multiple transmitters e.g. extra ISS for wind, extra temp sensor, requires the lsid_iss
+[WeatherLinkLiveUDP]
+    wll_ip = 1.2.3.4
+    poll_interval = 10              # number of seconds [minimal 10 sec.]
+    driver = user.weatherlinkliveudp
+    extra_id = 3                    # ID of the transmitter box
+    txid_instromet_sun = 4          # ID of the transmitter box
+```
+
+* `extra_id`: ID of an extra transmitter box measuring temperature
+  and humidity. Sets the observation types `extraTemp1` and
+  `extraHumid1`.
+* `txid_instromet_sun`: ID of an transmitter box connected to a
+  sunshine duration sensor of Instromet Ltd. The sensor is
+  connected to the rain input of the transmitter box and sends
+  one tick every 36 seconds of sunshine. Sets the observation
+  types `sunShineDur` and `daySunshineDur` (and `sunshine_time`
+  for compatibility reasons)
