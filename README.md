@@ -74,4 +74,6 @@ pip install requests
 * `txid_instromet_sun`: ID of an transmitter box connected to a
   sunshine duration sensor of Instromet Ltd. The sensor is
   connected to the rain input of the transmitter box and sends
-  one tick every 36 seconds of sunshine.
+  one tick every 36 seconds of sunshine. Sets the observation
+  types `sunShineDur` and `daySunshineDur` (and `sunshine_time`
+  for compatibility reasons)
